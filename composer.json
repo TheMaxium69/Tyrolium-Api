@@ -15,6 +15,7 @@
         "symfony/yaml": "8.1.*"
     },
     "require-dev": {
+        "roave/security-advisories": "dev-latest"
     },
     "config": {
         "allow-plugins": {
