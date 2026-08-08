@@ -15,7 +15,13 @@
         "symfony/yaml": "8.1.*"
     },
     "require-dev": {
-        "roave/security-advisories": "dev-latest"
+        "friendsofphp/php-cs-fixer": "^3.95",
+        "phpstan/phpstan": "^2.2",
+        "phpstan/phpstan-symfony": "^2.0",
+        "phpunit/phpunit": "^13.3",
+        "roave/security-advisories": "dev-latest",
+        "symfony/browser-kit": "8.1.*",
+        "symfony/css-selector": "8.1.*"
     },
     "config": {
         "allow-plugins": {

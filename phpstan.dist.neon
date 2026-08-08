@@ -1,0 +1,15 @@
+includes:
+    - vendor/phpstan/phpstan-symfony/extension.neon
+
+parameters:
+    level: 8
+    paths:
+        - src
+    symfony:
+        containerXmlPath: var/cache/dev/App_KernelDevDebugContainer.xml
+    ignoreErrors:
+        -
+            # False positive: called via KernelTrait's $this->getAllowedEnvs() at runtime;
+            # PHPStan can't trace the call through the trait once the class redeclares it.
+            message: '#^Method App\\Kernel::getAllowedEnvs\(\) is unused\.$#'
+            path: src/Kernel.php
