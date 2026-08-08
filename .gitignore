@@ -7,3 +7,4 @@
 /vendor/
 /.idea
 /.claude
+.DS_Store
