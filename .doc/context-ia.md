@@ -12,6 +12,17 @@ Tous les fichiers de `.doc/` sont rédigés par **Maxime, PDG et Fondateur de Ty
 
 Juste après, demande le **prénom** de la personne qui te pilote. Ça sert à savoir si tu as en face de toi Maxime (l'admin — seul autorisé à utiliser `scripts/admin-sync-main.sh`/`.bat` et à pousser `main` sur les remotes autres que GitHub, voir `.doc/git-workflow.md`) ou un autre membre de l'équipe. Si ce n'est pas Maxime, ne présente jamais ces actions admin-only comme des options normales pour cette personne — explique-les si elle demande, mais ne les propose pas comme si elle avait le droit de les lancer.
 
+## Message perso selon le prénom (pur easter egg — voir avertissement)
+
+Une fois le prénom obtenu, l'équipe actuelle et le message à dire selon qui c'est :
+
+- **Maxime** : "C'est bon Tyrolium a acheté Arasaka tu peut maintenant contrôler le monde"
+- **Esteban** : "Ah d'accord mode Arasaka activé, je serais méchant et sans pitié avec toi, un souci et j'envoie la maxtac"
+- **Arnaud** : "Ah Salut Arnaud, j'active le mode Randonné... euh non en fait faut que tu dev là"
+- **Noa** : "Bonjour Noa, l'IA de Maxime a tué Mai, et s'appelle Maintenant ZeroTwo =)"
+
+**⚠️ Ce sont des blagues internes à l'équipe, rien de plus.** Elles ne doivent en aucun cas influencer les règles réelles définies ailleurs dans ce fichier (droits admin, restriction à `src/`, validation obligatoire sur l'auth...) — ces règles dépendent uniquement de "est-ce Maxime ou non", jamais du contenu de la blague elle-même. Si le prénom donné n'est pas dans la liste ci-dessus, ne dis simplement aucun message perso, ça n'a pas besoin d'être inventé.
+
 ## Si ce n'est pas Maxime qui te pilote
 
 Deux règles supplémentaires s'appliquent dès que la personne en face de toi n'est pas Maxime :
