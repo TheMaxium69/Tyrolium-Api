@@ -18,7 +18,7 @@ Comment le repo est organisé (deux dépôts, branche protégée, PR obligatoire
 | Dépôt interne | `repo.tyrolium.fr` — mentionné par Maxime, **pas encore ajouté comme remote Git sur cette machine** (`git remote -v` ne montre que `origin` au moment de la rédaction). À ajouter avec `git remote add <nom> <url>` le jour où il est configuré ici. |
 | Branche de travail | `maxime` (et, une fois l'équipe dessus, une branche par personne/feature) — jamais de commit direct sur `main` |
 | Branche `main` | **Protégée côté GitHub** (confirmé par Maxime le 09/08/2026, non vérifié via l'API GitHub — `gh` CLI non installée sur cette machine au moment de la rédaction) : pas de push direct, tout passe par une Pull Request |
-| Scripts disponibles | `scripts/setup.{sh,bat}`, `scripts/pull.{sh,bat}`, `scripts/sync-main.{sh,bat}`, `scripts/push.{sh,bat}` — chacun en version bash (mac/Linux) et batch (Windows), même comportement des deux côtés |
+| Scripts disponibles | `scripts/setup.{sh,bat}`, `scripts/pull.{sh,bat}`, `scripts/sync-main.{sh,bat}`, `scripts/push.{sh,bat}`, `scripts/admin-sync-main.{sh,bat}` (**Maxime uniquement**) — chacun en version bash (mac/Linux) et batch (Windows), même comportement des deux côtés |
 
 ---
 
@@ -59,7 +59,15 @@ Fait : `git pull` → `composer install` (no-op si rien n'a changé) → `doctri
 
 Push la branche courante vers **tous** les remotes Git configurés sur ta machine (`git remote`) — pas d'URL en dur, donc que tu aies juste `origin` (GitHub) ou aussi `repo.tyrolium.fr` une fois ajouté, le script s'adapte sans modification.
 
-### 2.5 Vérifier qu'un script fait ce qu'il doit
+### 2.5 Propager `main` sur les autres dépôts (Maxime uniquement) → `admin-sync-main.sh` / `admin-sync-main.bat`
+
+```bash
+./scripts/admin-sync-main.sh
+```
+
+**Réservé à Maxime.** Après qu'une PR a été mergée sur GitHub, `main` n'existe encore que là-bas — ce script la propage vers les autres dépôts (`repo.tyrolium.fr` une fois ajouté comme remote). Fait : vérifie qu'il n'y a pas de changement non commité (bloque aussi si des fichiers non trackés traînent, ex: un script pas encore ajouté) → `git checkout main` → `git pull origin main` → liste tous les remotes autres que `origin` → demande confirmation (`[y/N]`) → `git push <remote> main` vers chacun. Les autres devs ne le lancent jamais : eux publient leur branche avec `push.sh`, jamais `main` directement.
+
+### 2.6 Vérifier qu'un script fait ce qu'il doit
 
 Tous les scripts sont idempotents et sans risque à relancer plusieurs fois (`setup.sh` et `pull.sh` ont été testés en conditions réelles sur ce repo le 09/08/2026). En cas de doute, lire le script lui-même — chacun fait moins de 40 lignes et log chaque étape (`==>`) avant de l'exécuter.
 
@@ -78,6 +86,12 @@ Un rebase réécrit l'historique de la branche — si elle est déjà poussée (
 ### Pourquoi `push.sh` détecte les remotes au lieu d'avoir une URL en dur
 
 Le second dépôt (`repo.tyrolium.fr`) n'est pas encore configuré sur toutes les machines, et son URL exacte n'était pas connue au moment d'écrire ce script. Plutôt que de coder en dur une adresse et devoir modifier le script plus tard, `push.sh` lit `git remote` et pousse vers tout ce qui y est configuré — ajouter le second dépôt (`git remote add repo-interne <url>`) suffit, aucun script à modifier.
+
+### Pourquoi `admin-sync-main.sh` est séparé de `push.sh` et réservé à Maxime
+
+`push.sh` publie la branche **courante** de n'importe quel dev vers tous les remotes — utile au quotidien, mais ça ne doit jamais concerner `main`. `main` ne doit avoir qu'une seule source de vérité pour la logique "PR + CI obligatoires" : GitHub (`origin`). Si n'importe qui pouvait pousser `main` directement sur `repo.tyrolium.fr`, ça court-circuiterait la protection de branche mise en place côté GitHub — `repo.tyrolium.fr` aurait un historique de `main` qui n'est jamais passé par une review ni par la CI. D'où un script séparé, avec sa propre confirmation, distinct du geste quotidien.
+
+**Important à comprendre : rien dans ce script n'empêche techniquement quelqu'un d'autre de le lancer.** Le seul vrai contrôle d'accès est côté serveur — les permissions Git configurées sur `main` pour chaque remote (Gitea, GitHub). Si un dev sans les droits d'écriture sur `main` exécute quand même `admin-sync-main.sh`, l'étape `git push` échouera simplement là-bas avec une erreur de permission. Le script est une commodité pour Maxime, pas une barrière de sécurité en soi — la vraie barrière est la configuration des droits sur chaque dépôt.
 
 ### Pourquoi la restriction stricte sur les IA
 
