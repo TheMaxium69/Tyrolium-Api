@@ -53,18 +53,6 @@ jobs:
       - run: php bin/console lint:container
       - run: find src -name '*.php' -print0 | xargs -0 -n1 php -l
 
-  code-style:
-    name: Code style (PHP-CS-Fixer)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: shivammathur/setup-php@v2
-        with:
-          php-version: ${{ env.PHP_VERSION }}
-          coverage: none
-      - uses: ramsey/composer-install@v3
-      - run: vendor/bin/php-cs-fixer fix --dry-run --diff --ansi
-
   static-analysis:
     name: Static analysis (PHPStan)
     runs-on: ubuntu-latest

@@ -1,0 +1,11 @@
+framework:
+    rate_limiter:
+        # Global anti-abuse limit applied to all /api/* requests (see ApiRateLimitSubscriber).
+        # token_bucket: tolerates short bursts, then throttles to a steady rate.
+        # TODO: in production, point the "cache.rate_limiter" pool (config/packages/cache.yaml)
+        # to Redis instead of its default filesystem adapter — a per-instance cache defeats
+        # the limit as soon as you run more than one app server.
+        api_global:
+            policy: token_bucket
+            limit: 100
+            rate: { interval: '1 minute', amount: 100 }

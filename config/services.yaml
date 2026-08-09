@@ -18,6 +18,21 @@ services:
     # this creates a service per class whose id is the fully-qualified class name
     App\:
         resource: '../src/'
+        exclude:
+            - '../src/Controller/Debug/'
+            # Plain global functions (composer.json "autoload.files"), not a DI-managed
+            # class — the container's directory scan otherwise expects every file under
+            # src/ to declare a class matching its PSR-4 path.
+            - '../src/Helper/'
 
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
+
+when@dev:
+    services:
+        # Debug-only controllers: excluded from App\ above, re-registered here so
+        # their routes only exist (and are only reachable) in the dev environment.
+        App\Controller\Debug\:
+            resource: '../src/Controller/Debug/'
+            autowire: true
+            autoconfigure: true
