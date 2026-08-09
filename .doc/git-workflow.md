@@ -18,7 +18,7 @@ Comment le repo est organisé (deux dépôts, branche protégée, PR obligatoire
 | Dépôt interne | `repo.tyrolium.fr` — mentionné par Maxime, **pas encore ajouté comme remote Git sur cette machine** (`git remote -v` ne montre que `origin` au moment de la rédaction). À ajouter avec `git remote add <nom> <url>` le jour où il est configuré ici. |
 | Branche de travail | `maxime` (et, une fois l'équipe dessus, une branche par personne/feature) — jamais de commit direct sur `main` |
 | Branche `main` | **Protégée côté GitHub** (confirmé par Maxime le 09/08/2026, non vérifié via l'API GitHub — `gh` CLI non installée sur cette machine au moment de la rédaction) : pas de push direct, tout passe par une Pull Request |
-| Scripts disponibles | `scripts/setup.{sh,bat}`, `scripts/pull.{sh,bat}`, `scripts/sync-main.{sh,bat}`, `scripts/push.{sh,bat}`, `scripts/admin-sync-main.{sh,bat}` (**Maxime uniquement**) — chacun en version bash (mac/Linux) et batch (Windows), même comportement des deux côtés |
+| Scripts disponibles | `scripts/setup.{sh,bat}`, `scripts/pull.{sh,bat}`, `scripts/new-branch.{sh,bat}`, `scripts/sync-main.{sh,bat}`, `scripts/push.{sh,bat}`, `scripts/admin-sync-main.{sh,bat}` (**Maxime uniquement**) — chacun en version bash (mac/Linux) et batch (Windows), même comportement des deux côtés |
 
 ---
 
@@ -43,7 +43,15 @@ Fait, dans l'ordre : `composer install` → crée `.env.local` depuis `.env.loca
 
 Fait : `git pull` → `composer install` (no-op si rien n'a changé) → `doctrine:migrations:migrate` (rejoue les migrations qu'un collègue a ajoutées, **jamais** `diff`/`make:migration` ici) → `cache:clear --env=dev`. Le réflexe à avoir en arrivant sur le projet, avant d'écrire une ligne de code.
 
-### 2.3 Après qu'une PR a été mergée sur `main` → `sync-main.sh` / `sync-main.bat`
+### 2.3 Démarrer une nouvelle feature → `new-branch.sh` / `new-branch.bat`
+
+```bash
+./scripts/new-branch.sh ma-nouvelle-branche
+```
+
+(ou sans argument, il demande le nom). Fait : vérifie qu'il n'y a pas de changement non commité → `git fetch origin main` → `git checkout -b <nom> origin/main` (la branche part du tout dernier `main` de GitHub, pas d'un `main` local potentiellement en retard) → `composer install` → `migrations:migrate` → `cache:clear --env=dev`. Objectif : en une commande, une branche neuve et un environnement prêt à coder, sans étape manuelle oubliée.
+
+### 2.4 Après qu'une PR a été mergée sur `main` → `sync-main.sh` / `sync-main.bat`
 
 ```bash
 ./scripts/sync-main.sh
@@ -51,7 +59,7 @@ Fait : `git pull` → `composer install` (no-op si rien n'a changé) → `doctri
 
 À lancer **depuis ta branche de feature**, jamais depuis `main`. Fait : vérifie que tu n'es pas sur `main` (sinon te renvoie vers `pull.sh`) → vérifie qu'il n'y a pas de changement non commité (sinon s'arrête, pour ne pas mélanger un merge avec du travail en cours) → `git fetch origin main` → `git merge origin/main` dans ta branche → si conflit, s'arrête et te dit de le résoudre à la main (`git status`, corriger, `git add`, `git commit`) → si la fusion passe, relance `composer install` + `migrations:migrate` au cas où `main` a apporté de nouvelles dépendances ou migrations.
 
-### 2.4 Publier ta branche → `push.sh` / `push.bat`
+### 2.5 Publier ta branche → `push.sh` / `push.bat`
 
 ```bash
 ./scripts/push.sh
@@ -59,7 +67,7 @@ Fait : `git pull` → `composer install` (no-op si rien n'a changé) → `doctri
 
 Push la branche courante vers **tous** les remotes Git configurés sur ta machine (`git remote`) — pas d'URL en dur, donc que tu aies juste `origin` (GitHub) ou aussi `repo.tyrolium.fr` une fois ajouté, le script s'adapte sans modification.
 
-### 2.5 Propager `main` sur les autres dépôts (Maxime uniquement) → `admin-sync-main.sh` / `admin-sync-main.bat`
+### 2.6 Propager `main` sur les autres dépôts (Maxime uniquement) → `admin-sync-main.sh` / `admin-sync-main.bat`
 
 ```bash
 ./scripts/admin-sync-main.sh
@@ -67,7 +75,7 @@ Push la branche courante vers **tous** les remotes Git configurés sur ta machin
 
 **Réservé à Maxime.** Après qu'une PR a été mergée sur GitHub, `main` n'existe encore que là-bas — ce script la propage vers les autres dépôts (`repo.tyrolium.fr` une fois ajouté comme remote). Fait : vérifie qu'il n'y a pas de changement non commité (bloque aussi si des fichiers non trackés traînent, ex: un script pas encore ajouté) → `git checkout main` → `git pull origin main` → liste tous les remotes autres que `origin` → demande confirmation (`[y/N]`) → `git push <remote> main` vers chacun. Les autres devs ne le lancent jamais : eux publient leur branche avec `push.sh`, jamais `main` directement.
 
-### 2.6 Vérifier qu'un script fait ce qu'il doit
+### 2.7 Vérifier qu'un script fait ce qu'il doit
 
 Tous les scripts sont idempotents et sans risque à relancer plusieurs fois (`setup.sh` et `pull.sh` ont été testés en conditions réelles sur ce repo le 09/08/2026). En cas de doute, lire le script lui-même — chacun fait moins de 40 lignes et log chaque étape (`==>`) avant de l'exécuter.
 
