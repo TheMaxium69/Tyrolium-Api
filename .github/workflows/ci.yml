@@ -2,8 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: ['**']
   pull_request:
+    branches: ['**']
 
 permissions:
   contents: read
@@ -76,4 +77,5 @@ jobs:
           php-version: ${{ env.PHP_VERSION }}
           coverage: none
       - uses: ramsey/composer-install@v3
+      - run: php bin/console lexik:jwt:generate-keypair --env=test --no-interaction
       - run: vendor/bin/phpunit --colors=always
