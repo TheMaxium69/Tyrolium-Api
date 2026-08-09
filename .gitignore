@@ -8,6 +8,7 @@
 /.idea
 /.claude
 .DS_Store
+/.doc
 
 ###> friendsofphp/php-cs-fixer ###
 /.php-cs-fixer.php

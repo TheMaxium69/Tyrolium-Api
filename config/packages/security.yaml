@@ -1,0 +1,38 @@
+security:
+    # https://symfony.com/doc/current/security.html#registering-the-user-hashing-passwords
+    password_hashers:
+        Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface: 'auto'
+
+    # https://symfony.com/doc/current/security.html#loading-the-user-the-user-provider
+    providers:
+        users_in_memory: { memory: null }
+
+    firewalls:
+        dev:
+            # Ensure dev tools and static assets are always allowed
+            pattern: ^/(_profiler|_wdt|assets|build)/
+            security: false
+        api:
+            pattern: ^/
+            stateless: true
+            lazy: true
+            provider: users_in_memory
+            # TODO: wire an authenticator here once the auth strategy (JWT / access token) is chosen.
+            # No session, no cookie: every request must carry its own proof of identity.
+
+    # Note: Only the *first* matching rule is applied
+    access_control:
+        # TODO: tighten this once an authenticator is in place, e.g.:
+        # - { path: ^/, roles: IS_AUTHENTICATED_FULLY }
+        - { path: ^/, roles: PUBLIC_ACCESS }
+
+when@test:
+    security:
+        password_hashers:
+            # Password hashers are resource-intensive by design to ensure security.
+            # In tests, it's safe to reduce their cost to improve performance.
+            Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface:
+                algorithm: auto
+                cost: 4 # Lowest possible value for bcrypt
+                time_cost: 3 # Lowest possible value for argon
+                memory_cost: 10 # Lowest possible value for argon
