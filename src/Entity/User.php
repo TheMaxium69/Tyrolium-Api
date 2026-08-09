@@ -3,6 +3,8 @@
 namespace App\Entity;
 
 use App\Repository\UserRepository;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
@@ -31,6 +33,24 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Assert\NotBlank(message: "Le mot de passe est obligatoire.")]
     #[Assert\Length(min: 8, minMessage: "Le mot de passe doit contenir au moins 8 caractères.")]
     private ?string $password = null;
+
+    #[ORM\Column(type: 'string', length: 64, nullable: true, unique: true)]
+    private ?string $resetToken = null;
+
+    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeImmutable $resetTokenExpiresAt = null;
+
+    /**
+     * @var Collection<int, UserEmail>
+     */
+    #[ORM\OneToMany(targetEntity: UserEmail::class, mappedBy: 'user', cascade: ['persist', 'remove'], orphanRemoval: true)]
+    #[Groups(['user:read'])]
+    private Collection $emails;
+
+    public function __construct()
+    {
+        $this->emails = new ArrayCollection();
+    }
 
     public function getId(): ?int
     {
@@ -77,5 +97,85 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     {
         // TODO: backed by a real column once role differentiation (RBAC) is needed.
         return ['ROLE_USER'];
+    }
+
+    public function getResetToken(): ?string
+    {
+        return $this->resetToken;
+    }
+
+    public function getResetTokenExpiresAt(): ?\DateTimeImmutable
+    {
+        return $this->resetTokenExpiresAt;
+    }
+
+    /**
+     * Génère un nouveau token de réinitialisation de mot de passe, valide 1h,
+     * et remplace tout token précédent.
+     */
+    public function generateResetToken(): string
+    {
+        $token = bin2hex(random_bytes(32));
+
+        $this->resetToken = $token;
+        $this->resetTokenExpiresAt = new \DateTimeImmutable('+1 hour');
+
+        return $token;
+    }
+
+    public function isResetTokenValid(): bool
+    {
+        return null !== $this->resetToken
+            && null !== $this->resetTokenExpiresAt
+            && $this->resetTokenExpiresAt > new \DateTimeImmutable();
+    }
+
+    public function clearResetToken(): void
+    {
+        $this->resetToken = null;
+        $this->resetTokenExpiresAt = null;
+    }
+
+    /**
+     * @return Collection<int, UserEmail>
+     */
+    public function getEmails(): Collection
+    {
+        return $this->emails;
+    }
+
+    public function addEmail(UserEmail $email): static
+    {
+        if (!$this->emails->contains($email)) {
+            $this->emails->add($email);
+            $email->setUser($this);
+        }
+
+        return $this;
+    }
+
+    public function removeEmail(UserEmail $email): static
+    {
+        $this->emails->removeElement($email);
+
+        return $this;
+    }
+
+    public function getDefaultEmail(): ?UserEmail
+    {
+        foreach ($this->emails as $email) {
+            if ($email->isDefault()) {
+                return $email;
+            }
+        }
+
+        return null;
+    }
+
+    public function hasVerifiedDefaultEmail(): bool
+    {
+        $defaultEmail = $this->getDefaultEmail();
+
+        return null !== $defaultEmail && $defaultEmail->isVerified();
     }
 }

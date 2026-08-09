@@ -5,7 +5,9 @@ security:
 
     # https://symfony.com/doc/current/security.html#loading-the-user-the-user-provider
     providers:
-        users_in_memory: { memory: null }
+        # Résout username OU email default vérifié — voir .doc/useritium-auth.md
+        app_user_provider:
+            id: App\Security\UserProvider
 
     firewalls:
         dev:
@@ -16,9 +18,17 @@ security:
             pattern: ^/
             stateless: true
             lazy: true
-            provider: users_in_memory
-            # TODO: wire an authenticator here once the auth strategy (JWT / access token) is chosen.
-            # No session, no cookie: every request must carry its own proof of identity.
+            provider: app_user_provider
+            user_checker: App\Security\UserChecker
+            # Valide le Bearer JWT sur chaque requête (sauf le check_path ci-dessous,
+            # intercepté par json_login avant que le token existe).
+            jwt: ~
+            json_login:
+                check_path: useritium_account_post_login
+                username_path: identifier
+                password_path: password
+                success_handler: App\Security\AuthenticationSuccessHandler
+                failure_handler: App\Security\AuthenticationFailureHandler
 
     # Note: Only the *first* matching rule is applied
     access_control:
