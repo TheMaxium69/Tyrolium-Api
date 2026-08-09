@@ -7,15 +7,10 @@
 /vendor/
 /.idea
 /.claude
-.DS_Store
-/.doc
-
-###> friendsofphp/php-cs-fixer ###
 /.php-cs-fixer.php
 /.php-cs-fixer.cache
-###< friendsofphp/php-cs-fixer ###
-
-###> phpunit/phpunit ###
 /phpunit.xml
 /.phpunit.cache/
-###< phpunit/phpunit ###
+/.doc/how-to-document.md
+/migrations
+.DS_Store
