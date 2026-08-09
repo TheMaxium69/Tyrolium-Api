@@ -244,6 +244,16 @@ class UseritiumAccountController extends AbstractController
     }
 
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
+    #[Route('/useritium/account/post-logout-all-devices', name: 'useritium_account_post_logout_all_devices', methods: ['POST'])]
+    public function postLogoutAllDevices(#[CurrentUser] User $user): JsonResponse
+    {
+        $user->invalidateAllTokens();
+        $this->entityManager->flush();
+
+        return apiSuccess(message: 'Déconnecté de tous les appareils. Tous les tokens émis avant maintenant sont désormais invalides.');
+    }
+
+    #[IsGranted('IS_AUTHENTICATED_FULLY')]
     #[Route('/useritium/account/post-set-default-email', name: 'useritium_account_post_set_default_email', methods: ['POST'])]
     public function postSetDefaultEmail(Request $request, #[CurrentUser] User $user): JsonResponse
     {

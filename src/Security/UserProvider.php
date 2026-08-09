@@ -6,6 +6,8 @@ use App\Entity\User;
 use App\Repository\UserEmailRepository;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Lexik\Bundle\JWTAuthenticationBundle\Security\User\PayloadAwareUserProviderInterface;
+use Symfony\Component\Security\Core\Exception\CustomUserMessageAuthenticationException;
 use Symfony\Component\Security\Core\Exception\UnsupportedUserException;
 use Symfony\Component\Security\Core\Exception\UserNotFoundException;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
@@ -18,9 +20,8 @@ use Symfony\Component\Security\Core\User\UserProviderInterface;
  * default de l'utilisateur (voir .doc/useritium-auth.md). Un email secondaire
  * non-default n'est volontairement jamais accepté ici.
  *
- * @implements UserProviderInterface<User>
  */
-class UserProvider implements UserProviderInterface, PasswordUpgraderInterface
+class UserProvider implements PayloadAwareUserProviderInterface, PasswordUpgraderInterface
 {
     public function __construct(
         private readonly UserRepository $userRepository,
@@ -43,6 +44,37 @@ class UserProvider implements UserProviderInterface, PasswordUpgraderInterface
 
         if (null === $user) {
             throw new UserNotFoundException(sprintf('Aucun utilisateur trouvé pour l\'identifiant "%s".', $identifier));
+        }
+
+        return $user;
+    }
+
+    /**
+     * Appelée par le JWTAuthenticator de Lexik (au lieu de loadUserByIdentifier)
+     * sur chaque requête authentifiée par Bearer token — voir "déconnecter de
+     * tous les appareils" dans .doc/useritium-auth.md. Le claim "iat" du JWT
+     * est comparé à User::$tokensValidSince : un token émis avant (ou pendant,
+     * "<=" volontaire — la colonne DB n'a qu'une précision à la seconde,
+     * voir User::invalidateAllTokens()) n'est plus valable, même s'il n'a pas
+     * encore atteint son "exp".
+     *
+     * @param array<string, mixed> $payload
+     *
+     * @return User
+     */
+    public function loadUserByIdentifierAndPayload(string $identifier, array $payload): UserInterface
+    {
+        $user = $this->loadUserByIdentifier($identifier);
+
+        $tokensValidSince = $user->getTokensValidSince();
+        $issuedAt = $payload['iat'] ?? null;
+
+        if (null !== $tokensValidSince && is_numeric($issuedAt)) {
+            $issuedAtDate = (new \DateTimeImmutable())->setTimestamp((int) $issuedAt);
+
+            if ($issuedAtDate <= $tokensValidSince) {
+                throw new CustomUserMessageAuthenticationException('Ce token a été révoqué (déconnexion de tous les appareils). Reconnecte-toi.');
+            }
         }
 
         return $user;

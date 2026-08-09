@@ -41,6 +41,14 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private ?\DateTimeImmutable $resetTokenExpiresAt = null;
 
     /**
+     * Tout JWT émis (claim "iat") avant cette date est rejeté — voir
+     * UserProvider::loadUserByIdentifierAndPayload(). Null = aucune
+     * restriction, comportement normal.
+     */
+    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeImmutable $tokensValidSince = null;
+
+    /**
      * @var Collection<int, UserEmail>
      */
     #[ORM\OneToMany(targetEntity: UserEmail::class, mappedBy: 'user', cascade: ['persist', 'remove'], orphanRemoval: true)]
@@ -134,6 +142,26 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     {
         $this->resetToken = null;
         $this->resetTokenExpiresAt = null;
+    }
+
+    public function getTokensValidSince(): ?\DateTimeImmutable
+    {
+        return $this->tokensValidSince;
+    }
+
+    /**
+     * "Déconnecter de tous les appareils" : tout JWT déjà émis devient
+     * instantanément invalide au prochain appel API, quel que soit
+     * l'appareil, sans avoir à attendre son expiration naturelle.
+     */
+    public function invalidateAllTokens(): void
+    {
+        // La colonne MySQL est un DATETIME sans fraction de seconde (pas de
+        // DATETIME(6)) : la précision réelle est la seconde, pas mieux. Voir
+        // UserProvider::loadUserByIdentifierAndPayload() qui compare avec
+        // "<=" (pas "<") pour cette raison — un token émis la même seconde
+        // que cet appel doit être rejeté lui aussi.
+        $this->tokensValidSince = new \DateTimeImmutable();
     }
 
     /**
