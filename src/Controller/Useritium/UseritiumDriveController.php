@@ -1,12 +1,12 @@
 <?php
 
-namespace App\Controller;
+namespace App\Controller\Useritium;
 
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
 
-final class Useritium/UseritiumDriveController extends AbstractController
+final class UseritiumDriveController extends AbstractController
 {
     #[Route('/useritium/useritium/drive', name: 'app_useritium_useritium_drive')]
     public function index(): JsonResponse
