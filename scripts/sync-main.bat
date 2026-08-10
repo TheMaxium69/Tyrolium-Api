@@ -17,10 +17,19 @@ for /f "delims=" %%s in ('git status --porcelain') do (
     exit /b 1
 )
 
-set REMOTE=origin
-git remote | findstr /x "origin" >nul 2>&1
-if errorlevel 1 (
-    echo Le remote "origin" n'existe pas sur ce poste.
+set REMOTE=
+for /f "delims=" %%r in ('git remote') do (
+    if "%%r"=="origin" set REMOTE=origin
+)
+
+if not defined REMOTE (
+    for /f "delims=" %%r in ('git remote') do (
+        if not defined REMOTE set REMOTE=%%r
+    )
+)
+
+if not defined REMOTE (
+    echo Aucun remote Git configure sur ce poste.
     exit /b 1
 )
 
