@@ -12,7 +12,6 @@
 /phpunit.xml
 /.phpunit.cache/
 /.doc/how-to-document.md
-/migrations
 .DS_Store
 
 ###> lexik/jwt-authentication-bundle ###
