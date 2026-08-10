@@ -168,3 +168,5 @@ Le dossier `.doc/` contient toute la documentation technique détaillée (config
 | `secrets-vault.md` | Secrets Vault Symfony |
 | `password-hashing.md` | hashing des mots de passe |
 | `useritium-auth.md` | design des 3 mécanismes d'authentification (JWT, OAuth2, SSO) |
+
+test pr
