@@ -1,12 +1,12 @@
 <?php
 
-namespace App\Controller;
+namespace App\Controller\Tyrolium;
 
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
 
-final class Tyrolium/TyroliumAnalyticsController extends AbstractController
+final class TyroliumAnalyticsController extends AbstractController
 {
     #[Route('/tyrolium/tyrolium/analytics', name: 'app_tyrolium_tyrolium_analytics')]
     public function index(): JsonResponse
