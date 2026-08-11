@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Controller\Filiales\SolidServ;
+namespace App\Controller\SolidServ;
 
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;

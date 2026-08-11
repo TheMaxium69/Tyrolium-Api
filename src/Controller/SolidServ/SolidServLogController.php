@@ -1,19 +1,19 @@
 <?php
 
-namespace App\Controller\Filiales\SolidServ;
+namespace App\Controller\SolidServ;
 
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
 
-final class SolidServProductController extends AbstractController
+final class SolidServLogController extends AbstractController
 {
-    #[Route('/filiales/solid/serv/solid/serv/product', name: 'app_filiales_solid_serv_solid_serv_product')]
+    #[Route('/filiales/solid/serv/solid/serv/log', name: 'app_filiales_solid_serv_solid_serv_log')]
     public function index(): JsonResponse
     {
         return $this->json([
             'message' => 'Welcome to your new controller!',
-            'path' => 'src/Controller/Filiales/SolidServ/SolidServProductController.php',
+            'path' => 'src/Controller/Filiales/SolidServ/SolidServLogController.php',
         ]);
     }
 }
