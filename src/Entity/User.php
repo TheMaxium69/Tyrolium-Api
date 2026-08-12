@@ -59,7 +59,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     /**
      * @var Collection<int, WebSite>
      */
-    #[ORM\OneToMany(targetEntity: WebSite::class, mappedBy: 'createdBy')]
+    #[ORM\OneToMany(targetEntity: WebSite::class, mappedBy: 'createBy')]
     private Collection $updateBy;
 
     /**
@@ -234,7 +234,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     {
         if (!$this->updateBy->contains($updateBy)) {
             $this->updateBy->add($updateBy);
-            $updateBy->setCreatedBy($this);
+            $updateBy->setCreateBy($this);
         }
 
         return $this;
@@ -244,8 +244,8 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     {
         if ($this->updateBy->removeElement($updateBy)) {
             // set the owning side to null (unless already changed)
-            if ($updateBy->getCreatedBy() === $this) {
-                $updateBy->setCreatedBy(null);
+            if ($updateBy->getCreateBy() === $this) {
+                $updateBy->setCreateBy(null);
             }
         }
 
