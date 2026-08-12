@@ -17,7 +17,7 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 final class TyroliumWebSiteController extends AbstractController
 {
 
-    private function __construct(
+    public function __construct(
         private readonly EntityManagerInterface $entityManager,
         private readonly UserRepository $userRepository,
         private readonly WebSiteRepository $webSiteRepository,
