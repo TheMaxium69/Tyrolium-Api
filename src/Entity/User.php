@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Entity\Tyrolium\WebSite;
 use App\Repository\UserRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -55,9 +56,23 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups(['user:read'])]
     private Collection $emails;
 
+    /**
+     * @var Collection<int, WebSite>
+     */
+    #[ORM\OneToMany(targetEntity: WebSite::class, mappedBy: 'createBy')]
+    private Collection $updateBy;
+
+    /**
+     * @var Collection<int, WebSite>
+     */
+    #[ORM\OneToMany(targetEntity: WebSite::class, mappedBy: 'updateBy')]
+    private Collection $name;
+
     public function __construct()
     {
         $this->emails = new ArrayCollection();
+        $this->updateBy = new ArrayCollection();
+        $this->name = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -205,5 +220,65 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $defaultEmail = $this->getDefaultEmail();
 
         return null !== $defaultEmail && $defaultEmail->isVerified();
+    }
+
+    /**
+     * @return Collection<int, WebSite>
+     */
+    public function getUpdateBy(): Collection
+    {
+        return $this->updateBy;
+    }
+
+    public function addUpdateBy(WebSite $updateBy): static
+    {
+        if (!$this->updateBy->contains($updateBy)) {
+            $this->updateBy->add($updateBy);
+            $updateBy->setCreateBy($this);
+        }
+
+        return $this;
+    }
+
+    public function removeUpdateBy(WebSite $updateBy): static
+    {
+        if ($this->updateBy->removeElement($updateBy)) {
+            // set the owning side to null (unless already changed)
+            if ($updateBy->getCreateBy() === $this) {
+                $updateBy->setCreateBy(null);
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, WebSite>
+     */
+    public function getName(): Collection
+    {
+        return $this->name;
+    }
+
+    public function addName(WebSite $name): static
+    {
+        if (!$this->name->contains($name)) {
+            $this->name->add($name);
+            $name->setUpdateBy($this);
+        }
+
+        return $this;
+    }
+
+    public function removeName(WebSite $name): static
+    {
+        if ($this->name->removeElement($name)) {
+            // set the owning side to null (unless already changed)
+            if ($name->getUpdateBy() === $this) {
+                $name->setUpdateBy(null);
+            }
+        }
+
+        return $this;
     }
 }

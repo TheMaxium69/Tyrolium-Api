@@ -2,10 +2,12 @@
 
 namespace App\Entity\Tyrolium;
 
+use App\Entity\User;
 use App\Repository\Tyrolium\WebSiteRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
+use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: WebSiteRepository::class)]
 #[ORM\Table(name: 'tyrolium_website')]
@@ -19,31 +21,40 @@ class WebSite
 
     #[ORM\Column(length: 180, unique: true)]
     #[Groups(['website:read'])]
+    #[Assert\NotBlank(message: 'Le champ domainName est obligatoire.')]
+    #[Assert\Hostname(message: 'Le nom de domaine "{{ value }}" n\'est pas un nom de domaine valide.')]
     private ?string $domainName = null;
-
-    #[ORM\Column(length: 255)]
-    #[Groups(['website:read'])]
-    private ?string $name = null;
-
-    #[ORM\Column(length: 50)]
-    #[Groups(['website:read'])]
-    private ?string $ownerType = null; // 'filiale' ou 'client_prestation'
-
-    #[ORM\Column(length: 255)]
-    #[Groups(['website:read'])]
-    private ?string $ownerName = null;
 
     #[ORM\Column(length: 255, nullable: true)]
     #[Groups(['website:read'])]
-    private ?string $serverInstance = null;
+    private ?string $label = null;
+
+    // ManyToOne quand table entreprise sera créée
+    // #[ORM\ManyToOne(targetEntity: 'App\Entity\Entreprise')]
+    #[ORM\Column(length: 255, nullable: true)]
+    #[Groups(['website:read'])]
+    #[Assert\NotBlank(message: 'Le champ owner est obligatoire.')]
+    private ?string $owner = null;
+
+    // ManyToOne quand table entreprise sera créée
+    // #[ORM\ManyToOne(targetEntity: 'App\Entity\Entreprise')]
+    #[ORM\Column(length: 255, nullable: true)]
+    #[Groups(['website:read'])]
+    private ?string $registrar = null;
+
+    // ManyToOne quand table server sera créée
+    // #[ORM\ManyToOne(targetEntity: 'App\Entity\SolidServ\Server')]
+    #[ORM\Column(length: 255, nullable: true)]
+    #[Groups(['website:read'])]
+    private ?string $server = null;
 
     #[ORM\Column(nullable: true)]
     #[Groups(['website:read'])]
-    private ?\DateTimeImmutable $renewalAt = null;
+    private ?\DateTimeImmutable $sslExpiresAt = null;
 
     #[ORM\Column(options: ['default' => true])]
     #[Groups(['website:read'])]
-    private bool $isAutoRenew = true;
+    private bool $isAutoSSLRenew = true;
 
     #[ORM\Column(length: 50, options: ['default' => 'active'])]
     #[Groups(['website:read'])]
@@ -51,19 +62,39 @@ class WebSite
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     #[Groups(['website:read'])]
-    private ?string $notes = null;
+    private ?string $content = null;
 
     #[ORM\Column]
     #[Groups(['website:read'])]
-    private ?\DateTimeImmutable $createdAt = null;
+    private ?\DateTimeImmutable $createAt = null;
 
     #[ORM\Column(nullable: true)]
     #[Groups(['website:read'])]
-    private ?\DateTimeImmutable $updatedAt = null;
+    private ?\DateTimeImmutable $updateAt = null;
+
+    #[ORM\ManyToOne]
+    #[Groups(['website:read'])]
+    private ?User $createBy = null;
+
+    #[ORM\ManyToOne]
+    #[Groups(['website:read'])]
+    private ?User $updateBy = null;
+
+    #[ORM\Column(nullable: true)]
+    #[Groups(['website:read'])]
+    private ?bool $isAutoDomainRenew = null;
+
+    #[ORM\Column(nullable: true)]
+    #[Groups(['website:read'])]
+    private ?\DateTimeImmutable $buyAt = null;
+
+    #[ORM\Column(nullable: true)]
+    #[Groups(['website:read'])]
+    private ?int $frequency = null;
 
     public function __construct()
     {
-        $this->createdAt = new \DateTimeImmutable();
+        $this->createAt = new \DateTimeImmutable();
     }
 
     public function getId(): ?int
@@ -83,74 +114,74 @@ class WebSite
         return $this;
     }
 
-    public function getName(): ?string
+    public function getLabel(): ?string
     {
-        return $this->name;
+        return $this->label;
     }
 
-    public function setName(string $name): static
+    public function setLabel(?string $label): static
     {
-        $this->name = $name;
+        $this->label = $label;
 
         return $this;
     }
 
-    public function getOwnerType(): ?string
+    public function getOwner(): ?string
     {
-        return $this->ownerType;
+        return $this->owner;
     }
 
-    public function setOwnerType(string $ownerType): static
+    public function setOwner(?string $owner): static
     {
-        $this->ownerType = $ownerType;
+        $this->owner = $owner;
 
         return $this;
     }
 
-    public function getOwnerName(): ?string
+    public function getRegistrar(): ?string
     {
-        return $this->ownerName;
+        return $this->registrar;
     }
 
-    public function setOwnerName(string $ownerName): static
+    public function setRegistrar(?string $registrar): static
     {
-        $this->ownerName = $ownerName;
+        $this->registrar = $registrar;
 
         return $this;
     }
 
-    public function getServerInstance(): ?string
+    public function getServer(): ?string
     {
-        return $this->serverInstance;
+        return $this->server;
     }
 
-    public function setServerInstance(?string $serverInstance): static
+    public function setServer(?string $server): static
     {
-        $this->serverInstance = $serverInstance;
+        $this->server = $server;
 
         return $this;
     }
 
-    public function getRenewalAt(): ?\DateTimeImmutable
+    public function getSSLExpiresAt(): ?\DateTimeImmutable
     {
-        return $this->renewalAt;
+        return $this->sslExpiresAt;
     }
 
-    public function setRenewalAt(?\DateTimeImmutable $renewalAt): static
+    public function setSSLExpiresAt(?\DateTimeImmutable $sslExpiresAt): static
     {
-        $this->renewalAt = $renewalAt;
+        $this->sslExpiresAt = $sslExpiresAt;
 
         return $this;
     }
 
-    public function isAutoRenew(): bool
+    public function isAutoSSLRenew(): bool
     {
-        return $this->isAutoRenew;
+        return $this->isAutoSSLRenew;
     }
 
-    public function setIsAutoRenew(bool $isAutoRenew): static
+    public function setIsAutoSSLRenew(bool $isAutoSSLRenew): static
     {
-        $this->isAutoRenew = $isAutoRenew;
+        $this->isAutoSSLRenew = $isAutoSSLRenew;
 
         return $this;
     }
@@ -167,38 +198,98 @@ class WebSite
         return $this;
     }
 
-    public function getNotes(): ?string
+    public function getContent(): ?string
     {
-        return $this->notes;
+        return $this->content;
     }
 
-    public function setNotes(?string $notes): static
+    public function setContent(?string $content): static
     {
-        $this->notes = $notes;
+        $this->content = $content;
 
         return $this;
     }
 
-    public function getCreatedAt(): ?\DateTimeImmutable
+    public function getCreateAt(): ?\DateTimeImmutable
     {
-        return $this->createdAt;
+        return $this->createAt;
     }
 
-    public function setCreatedAt(\DateTimeImmutable $createdAt): static
+    public function setCreateAt(\DateTimeImmutable $createAt): static
     {
-        $this->createdAt = $createdAt;
+        $this->createAt = $createAt;
 
         return $this;
     }
 
-    public function getUpdatedAt(): ?\DateTimeImmutable
+    public function getUpdateAt(): ?\DateTimeImmutable
     {
-        return $this->updatedAt;
+        return $this->updateAt;
     }
 
-    public function setUpdatedAt(?\DateTimeImmutable $updatedAt): static
+    public function setUpdateAt(?\DateTimeImmutable $updateAt): static
     {
-        $this->updatedAt = $updatedAt;
+        $this->updateAt = $updateAt;
+
+        return $this;
+    }
+
+    public function getCreateBy(): ?User
+    {
+        return $this->createBy;
+    }
+
+    public function setCreateBy(?User $createBy): static
+    {
+        $this->createBy = $createBy;
+
+        return $this;
+    }
+
+    public function getUpdateBy(): ?User
+    {
+        return $this->updateBy;
+    }
+
+    public function setUpdateBy(?User $updateBy): static
+    {
+        $this->updateBy = $updateBy;
+
+        return $this;
+    }
+
+    public function isAutoDomainRenew(): ?bool
+    {
+        return $this->isAutoDomainRenew;
+    }
+
+    public function setIsAutoDomainRenew(?bool $isAutoDomainRenew): static
+    {
+        $this->isAutoDomainRenew = $isAutoDomainRenew;
+
+        return $this;
+    }
+
+    public function getBuyAt(): ?\DateTimeImmutable
+    {
+        return $this->buyAt;
+    }
+
+    public function setBuyAt(?\DateTimeImmutable $buyAt): static
+    {
+        $this->buyAt = $buyAt;
+
+        return $this;
+    }
+
+    public function getFrequency(): ?int
+    {
+        return $this->frequency;
+    }
+
+    public function setFrequency(?int $frequency): static
+    {
+        $this->frequency = $frequency;
 
         return $this;
     }
@@ -207,16 +298,21 @@ class WebSite
      * @return array{
      *     id: int|null,
      *     domainName: string|null,
-     *     name: string|null,
-     *     ownerType: string|null,
-     *     ownerName: string|null,
-     *     serverInstance: string|null,
-     *     renewalAt: string|null,
-     *     isAutoRenew: bool,
+     *     label: string|null,
+     *     owner: string|null,
+     *     registrar: string|null,
+     *     server: string|null,
+     *     sslExpiresAt: string|null,
+     *     isAutoSSLRenew: bool,
+     *     isAutoDomainRenew: bool|null,
      *     status: string,
-     *     notes: string|null,
-     *     createdAt: string|null,
-     *     updatedAt: string|null
+     *     content: string|null,
+     *     createAt: string|null,
+     *     updateAt: string|null,
+     *     createBy: int|null,
+     *     updateBy: int|null,
+     *     frequency: int|null,
+     *     buyAt: string|null
      * }
      */
     public function toArray(): array
@@ -224,16 +320,21 @@ class WebSite
         return [
             'id' => $this->id,
             'domainName' => $this->domainName,
-            'name' => $this->name,
-            'ownerType' => $this->ownerType,
-            'ownerName' => $this->ownerName,
-            'serverInstance' => $this->serverInstance,
-            'renewalAt' => $this->renewalAt?->format(\DateTimeInterface::ATOM),
-            'isAutoRenew' => $this->isAutoRenew,
+            'label' => $this->label,
+            'owner' => $this->owner,
+            'registrar' => $this->registrar,
+            'server' => $this->server,
+            'sslExpiresAt' => $this->sslExpiresAt?->format(\DateTimeInterface::ATOM),
+            'isAutoSSLRenew' => $this->isAutoSSLRenew,
+            'isAutoDomainRenew' => $this->isAutoDomainRenew,
             'status' => $this->status,
-            'notes' => $this->notes,
-            'createdAt' => $this->createdAt?->format(\DateTimeInterface::ATOM),
-            'updatedAt' => $this->updatedAt?->format(\DateTimeInterface::ATOM),
+            'content' => $this->content,
+            'createAt' => $this->createAt?->format(\DateTimeInterface::ATOM),
+            'updateAt' => $this->updateAt?->format(\DateTimeInterface::ATOM),
+            'createBy' => $this->createBy?->getId(),
+            'updateBy' => $this->updateBy?->getId(),
+            'frequency' => $this->frequency,
+            'buyAt' => $this->buyAt?->format(\DateTimeInterface::ATOM),
         ];
     }
 }
