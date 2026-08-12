@@ -9,6 +9,14 @@ use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Validator\Constraints as Assert;
 
+enum WebSiteStatus: string
+{
+    case ACTIVE = 'active';
+    case EXPIRED = 'expired';
+    case PENDING_RENEWAL = 'pending_renewal';
+    case SUSPENDED = 'suspended';
+}
+
 #[ORM\Entity(repositoryClass: WebSiteRepository::class)]
 #[ORM\Table(name: 'tyrolium_website')]
 class WebSite
@@ -58,8 +66,7 @@ class WebSite
 
     #[ORM\Column(length: 50, options: ['default' => 'active'])]
     #[Groups(['website:read'])]
-    private string $status = 'active'; // 'active', 'expired', 'pending_renewal', 'suspended'
-
+    private WebSiteStatus $status = WebSiteStatus::ACTIVE;
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     #[Groups(['website:read'])]
     private ?string $content = null;
