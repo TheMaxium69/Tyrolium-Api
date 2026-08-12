@@ -7,6 +7,7 @@ use App\Repository\Tyrolium\WebSiteRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
+use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: WebSiteRepository::class)]
 #[ORM\Table(name: 'tyrolium_website')]
@@ -24,29 +25,25 @@ class WebSite
     #[Assert\Hostname(message: 'Le nom de domaine "{{ value }}" n\'est pas un nom de domaine valide.')]
     private ?string $domainName = null;
 
-
     #[ORM\Column(length: 255, nullable: true)]
     #[Groups(['website:read'])]
     private ?string $label = null;
 
-
-    // ManyToOne quand table entreprise sera créer
-    #[ORM\ManyToOne(targetEntity: 'App\Entity\Entreprise')]
+    // ManyToOne quand table entreprise sera créée
+    // #[ORM\ManyToOne(targetEntity: 'App\Entity\Entreprise')]
     #[ORM\Column(length: 255, nullable: true)]
     #[Groups(['website:read'])]
     #[Assert\NotBlank(message: 'Le champ owner est obligatoire.')]
     private ?string $owner = null;
 
-
-    // ManyToOne quand table entreprise sera créer
-    #[ORM\ManyToOne(targetEntity: 'App\Entity\Entreprise')]
+    // ManyToOne quand table entreprise sera créée
+    // #[ORM\ManyToOne(targetEntity: 'App\Entity\Entreprise')]
     #[ORM\Column(length: 255, nullable: true)]
     #[Groups(['website:read'])]
     private ?string $registrar = null;
 
-
-    // ManyToOne quand table server sera créer
-    #[ORM\ManyToOne(targetEntity: 'App\Entity\SolidServ\Server')]
+    // ManyToOne quand table server sera créée
+    // #[ORM\ManyToOne(targetEntity: 'App\Entity\SolidServ\Server')]
     #[ORM\Column(length: 255, nullable: true)]
     #[Groups(['website:read'])]
     private ?string $server = null;
@@ -69,35 +66,35 @@ class WebSite
 
     #[ORM\Column]
     #[Groups(['website:read'])]
-    private ?\DateTimeImmutable $createdAt = null;
+    private ?\DateTimeImmutable $createAt = null;
 
     #[ORM\Column(nullable: true)]
     #[Groups(['website:read'])]
-    private ?\DateTimeImmutable $updatedAt = null;
+    private ?\DateTimeImmutable $updateAt = null;
 
-    #[ORM\ManyToOne(inversedBy: 'updateBy')]
+    #[ORM\ManyToOne]
     #[Groups(['website:read'])]
-    private ?User $createdBy = null;
+    private ?User $createBy = null;
 
-    #[ORM\ManyToOne(inversedBy: 'name')]
+    #[ORM\ManyToOne]
     #[Groups(['website:read'])]
     private ?User $updateBy = null;
 
-    #[ORM\Column]
+    #[ORM\Column(nullable: true)]
     #[Groups(['website:read'])]
     private ?bool $isAutoDomainRenew = null;
 
     #[ORM\Column(nullable: true)]
     #[Groups(['website:read'])]
-    private ?\DateTime $buyAt = null;
+    private ?\DateTimeImmutable $buyAt = null;
 
     #[ORM\Column(nullable: true)]
     #[Groups(['website:read'])]
-    private ?\DateTime $frequency = null;
+    private ?int $frequency = null;
 
     public function __construct()
     {
-        $this->createdAt = new \DateTimeImmutable();
+        $this->createAt = new \DateTimeImmutable();
     }
 
     public function getId(): ?int
@@ -182,7 +179,7 @@ class WebSite
         return $this->isAutoSSLRenew;
     }
 
-    public function setisAutoSSLRenew(bool $isAutoSSLRenew): static
+    public function setIsAutoSSLRenew(bool $isAutoSSLRenew): static
     {
         $this->isAutoSSLRenew = $isAutoSSLRenew;
 
@@ -213,74 +210,38 @@ class WebSite
         return $this;
     }
 
-    public function getCreatedAt(): ?\DateTimeImmutable
+    public function getCreateAt(): ?\DateTimeImmutable
     {
-        return $this->createdAt;
+        return $this->createAt;
     }
 
-    public function setCreatedAt(\DateTimeImmutable $createdAt): static
+    public function setCreateAt(\DateTimeImmutable $createAt): static
     {
-        $this->createdAt = $createdAt;
+        $this->createAt = $createAt;
 
         return $this;
     }
 
-    public function getUpdatedAt(): ?\DateTimeImmutable
+    public function getUpdateAt(): ?\DateTimeImmutable
     {
-        return $this->updatedAt;
+        return $this->updateAt;
     }
 
-    public function setUpdatedAt(?\DateTimeImmutable $updatedAt): static
+    public function setUpdateAt(?\DateTimeImmutable $updateAt): static
     {
-        $this->updatedAt = $updatedAt;
+        $this->updateAt = $updateAt;
 
         return $this;
     }
 
-    /**
-     * @return array{
-     *     id: int|null,
-     *     domainName: string|null,
-     *     name: string|null,
-     *     label: string|null,
-     *     owner: string|null,
-     *     registrar: string|null,
-     *     server: string|null,
-     *     sslExpiresAt: string|null,
-     *     isAutoRenew: bool,
-     *     status: string,
-     *     notes: string|null,
-     *     createdAt: string|null,
-     *     updatedAt: string|null
-     * }
-     */
-    public function toArray(): array
+    public function getCreateBy(): ?User
     {
-        return [
-            'id' => $this->id,
-            'domainName' => $this->domainName,
-            'name' => $this->name,
-            'label' => $this->label,
-            'owner' => $this->owner,
-            'registrar' => $this->registrar,
-            'server' => $this->server,
-            'sslExpiresAt' => $this->sslExpiresAt?->format(\DateTimeInterface::ATOM),
-            'isAutoRenew' => $this->isAutoRenew,
-            'status' => $this->status,
-            'content' => $this->content,
-            'createdAt' => $this->createdAt?->format(\DateTimeInterface::ATOM),
-            'updatedAt' => $this->updatedAt?->format(\DateTimeInterface::ATOM),
-        ];
+        return $this->createBy;
     }
 
-    public function getCreatedBy(): ?User
+    public function setCreateBy(?User $createBy): static
     {
-        return $this->createdBy;
-    }
-
-    public function setCreatedBy(?User $createdBy): static
-    {
-        $this->createdBy = $createdBy;
+        $this->createBy = $createBy;
 
         return $this;
     }
@@ -302,7 +263,7 @@ class WebSite
         return $this->isAutoDomainRenew;
     }
 
-    public function setIsAutoDomainRenew(bool $isAutoDomainRenew): static
+    public function setIsAutoDomainRenew(?bool $isAutoDomainRenew): static
     {
         $this->isAutoDomainRenew = $isAutoDomainRenew;
 
@@ -321,15 +282,59 @@ class WebSite
         return $this;
     }
 
-    public function getFrequency(): ?\DateTimeImmutable
+    public function getFrequency(): ?int
     {
         return $this->frequency;
     }
 
-    public function setFrequency(?\DateTimeImmutable $frequency): static
+    public function setFrequency(?int $frequency): static
     {
         $this->frequency = $frequency;
 
         return $this;
+    }
+
+    /**
+     * @return array{
+     *     id: int|null,
+     *     domainName: string|null,
+     *     label: string|null,
+     *     owner: string|null,
+     *     registrar: string|null,
+     *     server: string|null,
+     *     sslExpiresAt: string|null,
+     *     isAutoSSLRenew: bool,
+     *     isAutoDomainRenew: bool|null,
+     *     status: string,
+     *     content: string|null,
+     *     createAt: string|null,
+     *     updateAt: string|null,
+     *     createBy: int|null,
+     *     updateBy: int|null,
+     *     frequency: int|null,
+     *     buyAt: string|null
+     * }
+     */
+    public function toArray(): array
+    {
+        return [
+            'id' => $this->id,
+            'domainName' => $this->domainName,
+            'label' => $this->label,
+            'owner' => $this->owner,
+            'registrar' => $this->registrar,
+            'server' => $this->server,
+            'sslExpiresAt' => $this->sslExpiresAt?->format(\DateTimeInterface::ATOM),
+            'isAutoSSLRenew' => $this->isAutoSSLRenew,
+            'isAutoDomainRenew' => $this->isAutoDomainRenew,
+            'status' => $this->status,
+            'content' => $this->content,
+            'createAt' => $this->createAt?->format(\DateTimeInterface::ATOM),
+            'updateAt' => $this->updateAt?->format(\DateTimeInterface::ATOM),
+            'createBy' => $this->createBy?->getId(),
+            'updateBy' => $this->updateBy?->getId(),
+            'frequency' => $this->frequency,
+            'buyAt' => $this->buyAt?->format(\DateTimeInterface::ATOM),
+        ];
     }
 }

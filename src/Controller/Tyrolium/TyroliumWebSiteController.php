@@ -3,32 +3,31 @@
 namespace App\Controller\Tyrolium;
 
 use App\Entity\Tyrolium\WebSite;
+use App\Entity\User;
 use App\Repository\Tyrolium\WebSiteRepository;
-use App\Repository\UserRepository;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use App\Entity\User;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\CurrentUser;
+use Symfony\Component\Serializer\Normalizer\NormalizerInterface;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 final class TyroliumWebSiteController extends AbstractController
 {
-
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
-        private readonly UserRepository $userRepository,
         private readonly WebSiteRepository $webSiteRepository,
         private readonly ValidatorInterface $validator,
-    ){
+        private readonly NormalizerInterface $normalizer,
+    ) {
     }
 
     #[Route('/tyrolium/web-site/post-web-site', name: 'tyrolium_web_site_post_web_site', methods: ['POST'])]
     public function postWebSite(Request $request, #[CurrentUser] ?User $currentUser): JsonResponse
     {
-
         $payload = json_decode($request->getContent(), true) ?? [];
 
         if (empty($payload)) {
@@ -66,61 +65,49 @@ final class TyroliumWebSiteController extends AbstractController
         }
 
         if (isset($payload['isAutoSSLRenew'])) {
-            $website->setisAutoSSLRenew((bool)$payload['isAutoSSLRenew']);
+            $website->setIsAutoSSLRenew((bool) $payload['isAutoSSLRenew']);
         }
 
         if (isset($payload['isAutoDomainRenew'])) {
-            $website->setisAutoSSLRenew((bool)$payload['isAutoDomainRenew']);
+            $website->setIsAutoDomainRenew((bool) $payload['isAutoDomainRenew']);
         }
 
         if ($currentUser) {
-            $website->setCreatedBy($currentUser);
+            $website->setCreateBy($currentUser);
         }
 
         $violations = $this->validator->validate($website);
 
-        $websiteViolations = $this->validator->validate($website, [
-            new Assert\NotBlank(message: 'Le champ owner est obligatoire.'),
-            new Assert\NotBlank(message: 'Le champ domainName est obligatoire.')
-        ]);
-
-        foreach ($websiteViolations as $violation) {
-            $violations->add($violation);
-        }
-
         if (count($violations) > 0) {
-            return apiValidationError($violations, 'données invalides.', 400);
+            return apiValidationError($violations, 'Données invalides.');
         }
 
         try {
             $this->entityManager->persist($website);
             $this->entityManager->flush();
         } catch (UniqueConstraintViolationException) {
-            return apiError('Nom de domain deja utiliser', 409);
+            return apiError('Nom de domaine déjà utilisé.', 409);
         }
 
-        $payload = $this->serialize->normalize($website, null, ['groups' => ['web_site:create']]);
+        $data = $this->normalizer->normalize($website, null, ['groups' => ['website:read']]);
 
         return apiSuccess(
-            data: $payload,
-            message: 'Site créer avec succes.',
+            data: $data,
+            message: 'Site créé avec succès.',
             code: 201
         );
     }
 
-
-
     #[Route('/tyrolium/web-site/put-update-web-site/{id}', name: 'tyrolium_web_site_put_update_web_site', methods: ['PUT'])]
     public function putUpdateWebSite(int $id, Request $request, #[CurrentUser] ?User $currentUser): JsonResponse
     {
-
         $website = $this->webSiteRepository->find($id);
 
         if (!$website) {
             return apiError('Site web / domaine non trouvé.', 404);
         }
 
-        $payload = json_decode($request->getContent(), true);
+        $payload = json_decode($request->getContent(), true) ?? [];
 
         if (empty($payload)) {
             return apiError('JSON invalide.', 400);
@@ -131,7 +118,7 @@ final class TyroliumWebSiteController extends AbstractController
         }
 
         if (isset($payload['label'])) {
-            $website->setlabel($payload['label']);
+            $website->setLabel($payload['label']);
         }
 
         if (isset($payload['owner'])) {
@@ -155,14 +142,14 @@ final class TyroliumWebSiteController extends AbstractController
         }
 
         if (isset($payload['isAutoSSLRenew'])) {
-            $website->setisAutoSSLRenew((bool) $payload['isAutoSSLRenew']);
+            $website->setIsAutoSSLRenew((bool) $payload['isAutoSSLRenew']);
         }
 
         if (isset($payload['isAutoDomainRenew'])) {
             $website->setIsAutoDomainRenew((bool) $payload['isAutoDomainRenew']);
         }
 
-        $website->setUpdatedAt(new \DateTimeImmutable());
+        $website->setUpdateAt(new \DateTimeImmutable());
         if ($currentUser) {
             $website->setUpdateBy($currentUser);
         }
@@ -179,7 +166,7 @@ final class TyroliumWebSiteController extends AbstractController
             return apiError('Ce nom de domaine est déjà utilisé.', 409);
         }
 
-        $data = $this->serializer->normalize($website, null, ['groups' => 'website:read']);
+        $data = $this->normalizer->normalize($website, null, ['groups' => ['website:read']]);
 
         return apiSuccess(
             data: $data,
@@ -187,11 +174,9 @@ final class TyroliumWebSiteController extends AbstractController
         );
     }
 
-
-
     #[Route('/tyrolium/web-site/delete-web-site/{id}', name: 'tyrolium_web_site_delete_web_site', methods: ['DELETE'])]
-    public function deleteWebSite( int $id ): JsonResponse {
-
+    public function deleteWebSite(int $id): JsonResponse
+    {
         $website = $this->webSiteRepository->find($id);
 
         if (!$website) {
@@ -207,18 +192,15 @@ final class TyroliumWebSiteController extends AbstractController
         );
     }
 
-
-
-
     #[Route('/tyrolium/web-site/get-all', name: 'tyrolium_web_site_get_all', methods: ['GET'])]
-    public function getAll(WebSiteRepository $webSiteRepository): JsonResponse
+    public function getAll(): JsonResponse
     {
-        $sites = $webSiteRepository->findAll();
+        $sites = $this->webSiteRepository->findAll();
 
         // Trie en PHP par la date d'expiration SSL la plus proche (valeurs nulles à la fin)
         usort($sites, static function (WebSite $a, WebSite $b) {
-            $dateA = $a->getSslExpiresAt();
-            $dateB = $b->getSslExpiresAt();
+            $dateA = $a->getSSLExpiresAt();
+            $dateB = $b->getSSLExpiresAt();
 
             if (null === $dateA && null === $dateB) {
                 return 0;
@@ -239,37 +221,40 @@ final class TyroliumWebSiteController extends AbstractController
     }
 
     #[Route('/tyrolium/web-site/get-one/{id}', name: 'tyrolium_web_site_get_one', methods: ['GET'])]
-    public function getOneById(int $id, WebSiteRepository $webSiteRepository): JsonResponse
+    public function getOneById(int $id): JsonResponse
     {
-        $site = $webSiteRepository->find($id);
+        $site = $this->webSiteRepository->find($id);
         if (!$site) {
             return apiError('Site web introuvable pour cet ID.', 404);
         }
         $payload = $site->toArray();
+
         return apiSuccess($payload, 'Détails du site web récupérés avec succès.');
     }
 
     #[Route('/tyrolium/web-site/get-search', name: 'tyrolium_web_site_get_search', methods: ['GET'])]
-    public function getSearch(Request $request, WebSiteRepository $webSiteRepository): JsonResponse
+    public function getSearch(Request $request): JsonResponse
     {
-        $query = trim((string)($request->query->get('q') ?? $request->query->get('domain_name') ?? ''));
+        $query = trim((string) ($request->query->get('q') ?? $request->query->get('domain_name') ?? ''));
         if ('' === $query) {
             return apiError('Le paramètre de recherche ?q= ou ?domain_name= est requis.', 400);
         }
-        $sites = $webSiteRepository->createQueryBuilder('w')
+
+        $sites = $this->webSiteRepository->createQueryBuilder('w')
             ->where('LOWER(w.domainName) LIKE LOWER(:query)')
             ->orWhere('LOWER(w.label) LIKE LOWER(:query)')
-            ->orWhere('LOWER(w.name) LIKE LOWER(:query)')
             ->setParameter('query', '%' . $query . '%')
             ->orderBy('w.domainName', 'ASC')
             ->getQuery()
             ->getResult();
+
         $payload = array_map(static fn (WebSite $site) => $site->toArray(), $sites);
+
         return apiSuccess($payload, 'Résultats de la recherche pour "' . $query . '".');
     }
 
     #[Route('/tyrolium/web-site/get-all-by-client/{owner}', name: 'tyrolium_web_site_get_all_by_client', methods: ['GET'])]
-    public function getAllByClient(string $owner, WebSiteRepository $webSiteRepository): JsonResponse
+    public function getAllByClient(string $owner): JsonResponse
     {
         $ownerName = trim(urldecode($owner));
 
@@ -277,11 +262,9 @@ final class TyroliumWebSiteController extends AbstractController
             return apiError('Le nom du client (owner) est obligatoire.', 400);
         }
 
-        $sites = $webSiteRepository->findBy(['owner' => $ownerName], ['domainName' => 'ASC']);
+        $sites = $this->webSiteRepository->findBy(['owner' => $ownerName], ['domainName' => 'ASC']);
         $payload = array_map(static fn (WebSite $site) => $site->toArray(), $sites);
 
         return apiSuccess($payload, 'Liste des sites web du client "' . $ownerName . '" récupérée.');
     }
-
 }
-
