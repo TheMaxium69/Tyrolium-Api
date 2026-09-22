@@ -1,0 +1,64 @@
+
+services:
+###> doctrine/doctrine-bundle ###
+  database:
+    image: mysql:${MYSQL_VERSION:-8.0}
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-tyrolium-api}
+      MYSQL_USER: ${MYSQL_USER:-tyrolium-api}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-tyrolium-api}
+      # You should definitely change the password in production
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+    ports:
+      # Même port que le DATABASE_URL de .env.local.template (127.0.0.1:3306) —
+      # aucune modif nécessaire côté Symfony une fois le conteneur démarré.
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root}"]
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    volumes:
+      - database_data:/var/lib/mysql:rw
+      # You may use a bind-mounted host directory instead, so that it is harder to accidentally remove the volume and lose all your data!
+      # - ./docker/db/data:/var/lib/mysql:rw
+###< doctrine/doctrine-bundle ###
+
+  # API Symfony servie par Apache (docker/php-apache/). Bascule dev/prod via la
+  # variable d'env APP_ENV (voir .doc/env-files.md pour ce qu'elle change côté
+  # Symfony) :
+  #   docker compose up -d app                # dev (défaut)
+  #   APP_ENV=prod docker compose up -d app    # prod (composer --no-dev, cache
+  #                                             # prod, pas de debug)
+  # Pas un vrai déploiement prod — juste de quoi tester le comportement "prod"
+  # en local. Voir .doc/env-files.md section 2.5.
+  app:
+    build:
+      context: .
+      dockerfile: docker/php-apache/Dockerfile
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      APP_ENV: ${APP_ENV:-dev}
+      # Le conteneur app rejoint database par son nom de service Docker, pas par
+      # 127.0.0.1:3306 (ça, c'est pour un Symfony natif sur l'hôte, cf. .env.local).
+      DATABASE_URL: "mysql://${MYSQL_USER:-tyrolium-api}:${MYSQL_PASSWORD:-tyrolium-api}@database:3306/${MYSQL_DATABASE:-tyrolium-api}?serverVersion=${MYSQL_VERSION:-8.0}&charset=utf8mb4"
+      # Valeurs de .env.dev réutilisées ici : non sensibles par convention sur ce
+      # projet (voir .doc/env-files.md), et doivent rester identiques à celles
+      # utilisées pour générer config/jwt/*.pem (sinon déchiffrement impossible).
+      APP_SECRET: ${APP_SECRET:-0fdee7da668dc743fdb14a757d98ec64}
+      JWT_PASSPHRASE: ${JWT_PASSPHRASE:-8b870bb67d45f0166554487ad19b98569b56edee4adf215e05ee3e959d57d02d}
+    ports:
+      - "${APP_HTTP_PORT:-8080}:80"
+    volumes:
+      # vendor/ et var/ restent dans le bind-mount (partagés avec l'hôte) : un
+      # volume nommé imbriqué dessous empêcherait composer/Symfony de recréer
+      # ces dossiers (impossible de supprimer un point de montage — testé en
+      # réel, "Device or resource busy"). Voir docker/php-apache/entrypoint.sh.
+      - .:/var/www/html
+
+volumes:
+###> doctrine/doctrine-bundle ###
+  database_data:
+###< doctrine/doctrine-bundle ###

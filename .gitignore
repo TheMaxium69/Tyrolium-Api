@@ -1,0 +1,19 @@
+/.env.local
+/.env.local.php
+/.env.*.local
+/config/secrets/prod/prod.decrypt.private.php
+/public/bundles/
+/var/
+/vendor/
+/.idea
+/.claude
+/.php-cs-fixer.php
+/.php-cs-fixer.cache
+/phpunit.xml
+/.phpunit.cache/
+/.doc/
+.DS_Store
+
+###> lexik/jwt-authentication-bundle ###
+/config/jwt/*.pem
+###< lexik/jwt-authentication-bundle ###

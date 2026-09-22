@@ -1,0 +1,48 @@
+security:
+    # https://symfony.com/doc/current/security.html#registering-the-user-hashing-passwords
+    password_hashers:
+        Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface: 'auto'
+
+    # https://symfony.com/doc/current/security.html#loading-the-user-the-user-provider
+    providers:
+        # Résout username OU email default vérifié — voir .doc/useritium-auth.md
+        app_user_provider:
+            id: App\Security\UserProvider
+
+    firewalls:
+        dev:
+            # Ensure dev tools and static assets are always allowed
+            pattern: ^/(_profiler|_wdt|assets|build)/
+            security: false
+        api:
+            pattern: ^/
+            stateless: true
+            lazy: true
+            provider: app_user_provider
+            user_checker: App\Security\UserChecker
+            # Valide le Bearer JWT sur chaque requête (sauf le check_path ci-dessous,
+            # intercepté par json_login avant que le token existe).
+            jwt: ~
+            json_login:
+                check_path: useritium_account_post_login
+                username_path: identifier
+                password_path: password
+                success_handler: App\Security\AuthenticationSuccessHandler
+                failure_handler: App\Security\AuthenticationFailureHandler
+
+    # Note: Only the *first* matching rule is applied
+    access_control:
+        # TODO: tighten this once more controllers exist, e.g.:
+        # - { path: ^/, roles: IS_AUTHENTICATED_FULLY }
+        - { path: ^/, roles: PUBLIC_ACCESS }
+
+when@test:
+    security:
+        password_hashers:
+            # Password hashers are resource-intensive by design to ensure security.
+            # In tests, it's safe to reduce their cost to improve performance.
+            Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface:
+                algorithm: auto
+                cost: 4 # Lowest possible value for bcrypt
+                time_cost: 3 # Lowest possible value for argon
+                memory_cost: 10 # Lowest possible value for argon
