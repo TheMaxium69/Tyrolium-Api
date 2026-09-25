@@ -17,6 +17,8 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
+use Symfony\Component\Serializer\Normalizer\AbstractObjectNormalizer;
+use Symfony\Component\Serializer\Normalizer\NormalizerInterface;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 /**
@@ -42,6 +44,7 @@ class TyroliumPermissionController extends AbstractController
         private readonly UserPermissionRepository $userPermissionRepository,
         private readonly UserRepository $userRepository,
         private readonly ValidatorInterface $validator,
+        private readonly NormalizerInterface $serializer,
     ) {
     }
 
@@ -50,7 +53,7 @@ class TyroliumPermissionController extends AbstractController
     public function getAllPermission(): JsonResponse
     {
         $permissions = array_map(
-            fn (Permission $permission): array => $this->serializePermission($permission),
+            fn (Permission $permission): array => $this->normalizePermission($permission),
             $this->permissionRepository->findAll(),
         );
 
@@ -67,7 +70,7 @@ class TyroliumPermissionController extends AbstractController
             return apiError('Utilisateur introuvable.', 404);
         }
 
-        return apiSuccess(data: $this->serializeUserAccess($user));
+        return apiSuccess(data: $this->normalizeUserAccess($user));
     }
 
     /**
@@ -82,7 +85,7 @@ class TyroliumPermissionController extends AbstractController
     #[Route('/tyrolium/permission/get-my-permission', name: 'tyrolium_permission_get_my_permission', methods: ['GET'])]
     public function getMyPermission(#[CurrentUser] User $user): JsonResponse
     {
-        return apiSuccess(data: $this->serializeUserAccess($user));
+        return apiSuccess(data: $this->normalizeUserAccess($user));
     }
 
     #[IsGranted('ROLE_OWNER')]
@@ -111,7 +114,7 @@ class TyroliumPermissionController extends AbstractController
             return apiError('Une permission avec ce nom existe déjà.', 409);
         }
 
-        return apiSuccess(data: $this->serializePermission($permission), message: 'Permission créée.', code: 201);
+        return apiSuccess(data: $this->normalizePermission($permission), message: 'Permission créée.', code: 201);
     }
 
     /**
@@ -207,7 +210,7 @@ class TyroliumPermissionController extends AbstractController
             return apiError('Cet utilisateur a déjà cette permission.', 409);
         }
 
-        return apiSuccess(data: $this->serializeUserPermission($userPermission), message: 'Permission accordée.', code: 201);
+        return apiSuccess(data: $this->normalizeUserPermission($userPermission), message: 'Permission accordée.', code: 201);
     }
 
     /**
@@ -249,7 +252,7 @@ class TyroliumPermissionController extends AbstractController
         $permission->addImpliedPermission($implied);
         $this->entityManager->flush();
 
-        return apiSuccess(data: $this->serializePermission($permission), message: 'Permission liée.');
+        return apiSuccess(data: $this->normalizePermission($permission), message: 'Permission liée.');
     }
 
     #[IsGranted('ROLE_OWNER')]
@@ -269,7 +272,7 @@ class TyroliumPermissionController extends AbstractController
         $permission->removeImpliedPermission($implied);
         $this->entityManager->flush();
 
-        return apiSuccess(data: $this->serializePermission($permission), message: 'Lien retiré.');
+        return apiSuccess(data: $this->normalizePermission($permission), message: 'Lien retiré.');
     }
 
     #[IsGranted('ROLE_OWNER')]
@@ -314,58 +317,56 @@ class TyroliumPermissionController extends AbstractController
     }
 
     /**
-     * accessLevel + attributions brutes (user_permission) + rôles Symfony
-     * réellement effectifs à cet instant (getRoles(), permissions parapluie
-     * déjà dépliées) — c'est ce dernier champ qu'un front doit utiliser pour
-     * ses guards/affichage, pas décoder un JWT potentiellement périmé.
+     * accessLevel + rôles Symfony réellement effectifs à cet instant
+     * (getRoles(), permissions parapluie déjà dépliées — groupe "user:access",
+     * voir User.php) + attributions brutes (groupe "user_permission:read").
+     * `roles` est le champ qu'un front doit utiliser pour ses guards/
+     * affichage, pas décoder un JWT potentiellement périmé (voir
+     * .doc/permissions.md section 3).
      *
      * @return array<string, mixed>
      */
-    private function serializeUserAccess(User $user): array
+    private function normalizeUserAccess(User $user): array
     {
-        $granted = array_map(
-            fn (UserPermission $userPermission): array => $this->serializeUserPermission($userPermission),
+        /** @var array<string, mixed> $access */
+        $access = $this->serializer->normalize($user, context: ['groups' => ['user:access']]);
+
+        $access['permissions'] = array_map(
+            fn (UserPermission $userPermission): array => $this->normalizeUserPermission($userPermission),
             $user->getPermissions()->toArray(),
         );
 
-        return [
-            'accessLevel' => $user->getAccessLevel()->value,
-            'permissions' => $granted,
-            'roles' => $user->getRoles(),
-        ];
+        return $access;
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function serializePermission(Permission $permission): array
+    private function normalizePermission(Permission $permission): array
     {
-        return [
-            'id' => $permission->getId(),
-            'name' => $permission->getName(),
-            'label' => $permission->getLabel(),
-            // Un seul niveau (pas récursif) — évite tout risque de boucle
-            // dans la sérialisation JSON même si le catalogue a un cycle.
-            'impliedPermissions' => array_map(
-                static fn (Permission $p): array => ['id' => $p->getId(), 'name' => $p->getName()],
-                $permission->getImpliedPermissions()->toArray(),
-            ),
-        ];
+        /** @var array<string, mixed> $data */
+        $data = $this->serializer->normalize($permission, context: [
+            'groups' => ['permission:read'],
+            // impliedPermissions est #[MaxDepth(1)] sur Permission — sans ce
+            // flag, MaxDepth est ignoré et le Serializer récurserait sans fin
+            // sur un catalogue auto-référencé (voir Permission::$impliedPermissions).
+            AbstractObjectNormalizer::ENABLE_MAX_DEPTH => true,
+        ]);
+
+        return $data;
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function serializeUserPermission(UserPermission $userPermission): array
+    private function normalizeUserPermission(UserPermission $userPermission): array
     {
-        $permission = $userPermission->getPermission()
-            ?? throw new \LogicException('Une UserPermission persistée doit toujours avoir une Permission (colonne NOT NULL).');
+        /** @var array<string, mixed> $data */
+        $data = $this->serializer->normalize($userPermission, context: [
+            'groups' => ['user_permission:read', 'permission:read', 'user:identifier'],
+            AbstractObjectNormalizer::ENABLE_MAX_DEPTH => true,
+        ]);
 
-        return [
-            'id' => $userPermission->getId(),
-            'permission' => $this->serializePermission($permission),
-            'grantedBy' => $userPermission->getGrantedBy()?->getUsername(),
-            'grantedAt' => $userPermission->getGrantedAt()->format(DATE_ATOM),
-        ];
+        return $data;
     }
 }

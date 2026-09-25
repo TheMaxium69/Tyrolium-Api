@@ -25,7 +25,12 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private ?int $id = null;
 
     #[ORM\Column(type: 'string', length: 180, unique: true)]
-    #[Groups(['user:read'])]
+    // "user:identifier" : groupe volontairement minimal (juste le username),
+    // pour afficher "qui a fait cette action" (grantedBy/createdBy ailleurs
+    // dans le projet) sans jamais entraîner les emails via "user:read" —
+    // "user:read" reste réservé aux endpoints qui affichent vraiment un
+    // profil complet (ex: UseritiumAdminController::getAllUser()).
+    #[Groups(['user:read', 'user:identifier'])]
     #[Assert\NotBlank(message: "Le nom d'utilisateur est obligatoire.")]
     #[Assert\Length(min: 3, max: 180, minMessage: "Le nom d'utilisateur doit contenir au moins 3 caractères.", maxMessage: "Le nom d'utilisateur ne peut pas dépasser 180 caractères.")]
     private ?string $username = null;
@@ -69,9 +74,11 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
      * l'API/CLI, uniquement en DB directement par Maxime.
      */
     #[ORM\Column(type: 'string', length: 20, enumType: AccessLevel::class, options: ['default' => 'user'])]
+    #[Groups(['user:read', 'user:access'])]
     private AccessLevel $accessLevel = AccessLevel::USER;
 
     #[ORM\Column(type: 'datetime_immutable')]
+    #[Groups(['user:read'])]
     private \DateTimeImmutable $createdAt;
 
     public function __construct()
@@ -133,6 +140,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
      *
      * @return list<string>
      */
+    #[Groups(['user:access'])]
     public function getRoles(): array
     {
         $roles = ['ROLE_USER'];

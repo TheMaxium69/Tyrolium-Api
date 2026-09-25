@@ -4,6 +4,7 @@ namespace App\Entity;
 
 use App\Repository\UserPermissionRepository;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Serializer\Attribute\Groups;
 
 /**
  * Attribution d'une Permission à un User — table de jointure avec
@@ -17,6 +18,7 @@ class UserPermission
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'integer')]
+    #[Groups(['user_permission:read'])]
     private ?int $id = null;
 
     #[ORM\ManyToOne(targetEntity: User::class, inversedBy: 'permissions')]
@@ -25,6 +27,7 @@ class UserPermission
 
     #[ORM\ManyToOne(targetEntity: Permission::class)]
     #[ORM\JoinColumn(name: 'permission_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
+    #[Groups(['user_permission:read'])]
     private ?Permission $permission = null;
 
     /**
@@ -34,9 +37,11 @@ class UserPermission
      */
     #[ORM\ManyToOne(targetEntity: User::class)]
     #[ORM\JoinColumn(name: 'granted_by_id', referencedColumnName: 'id', nullable: true, onDelete: 'SET NULL')]
+    #[Groups(['user_permission:read'])]
     private ?User $grantedBy = null;
 
     #[ORM\Column(type: 'datetime_immutable')]
+    #[Groups(['user_permission:read'])]
     private \DateTimeImmutable $grantedAt;
 
     public function __construct()

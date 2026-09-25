@@ -4,6 +4,7 @@ namespace App\Entity;
 
 use App\Repository\ApiKeyPermissionRepository;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Serializer\Attribute\Groups;
 
 /**
  * Attribution d'une Permission à une ApiKey — même rôle que UserPermission,
@@ -17,6 +18,7 @@ class ApiKeyPermission
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'integer')]
+    #[Groups(['api_key_permission:read'])]
     private ?int $id = null;
 
     #[ORM\ManyToOne(targetEntity: ApiKey::class, inversedBy: 'permissions')]
@@ -25,13 +27,16 @@ class ApiKeyPermission
 
     #[ORM\ManyToOne(targetEntity: Permission::class)]
     #[ORM\JoinColumn(name: 'permission_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
+    #[Groups(['api_key_permission:read'])]
     private ?Permission $permission = null;
 
     #[ORM\ManyToOne(targetEntity: User::class)]
     #[ORM\JoinColumn(name: 'granted_by_id', referencedColumnName: 'id', nullable: true, onDelete: 'SET NULL')]
+    #[Groups(['api_key_permission:read'])]
     private ?User $grantedBy = null;
 
     #[ORM\Column(type: 'datetime_immutable')]
+    #[Groups(['api_key_permission:read'])]
     private \DateTimeImmutable $grantedAt;
 
     public function __construct()

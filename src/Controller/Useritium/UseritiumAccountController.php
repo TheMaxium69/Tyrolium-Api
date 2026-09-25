@@ -18,6 +18,7 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Core\Exception\UserNotFoundException;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
+use Symfony\Component\Serializer\Normalizer\NormalizerInterface;
 use Symfony\Component\Validator\Constraints as Assert;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
@@ -41,6 +42,7 @@ class UseritiumAccountController extends AbstractController
         private readonly UserPasswordHasherInterface $passwordHasher,
         private readonly ValidatorInterface $validator,
         private readonly UserProvider $userProvider,
+        private readonly NormalizerInterface $serializer,
         #[Autowire('%kernel.environment%')]
         private readonly string $environment,
     ) {
@@ -94,7 +96,7 @@ class UseritiumAccountController extends AbstractController
         }
 
         return apiSuccess(
-            data: $this->withDebugToken(['username' => $user->getUsername()], 'verificationToken', $verificationToken),
+            data: $this->withDebugToken($this->normalizeUser($user), 'verificationToken', $verificationToken),
             message: 'Compte créé. Vérifie ton email avant de pouvoir te connecter.',
             code: 201,
         );
@@ -242,7 +244,7 @@ class UseritiumAccountController extends AbstractController
         }
 
         return apiSuccess(
-            data: $this->withDebugToken(['id' => $userEmail->getId(), 'email' => $userEmail->getEmail()], 'verificationToken', $verificationToken),
+            data: $this->withDebugToken($this->normalizeUserEmail($userEmail), 'verificationToken', $verificationToken),
             message: 'Email ajouté. Vérifie-le avant de pouvoir le passer par défaut.',
             code: 201,
         );
@@ -317,6 +319,28 @@ class UseritiumAccountController extends AbstractController
         $this->entityManager->flush();
 
         return apiSuccess(message: 'Email supprimé.');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function normalizeUser(User $user): array
+    {
+        /** @var array<string, mixed> $data */
+        $data = $this->serializer->normalize($user, context: ['groups' => ['user:identifier']]);
+
+        return $data;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function normalizeUserEmail(UserEmail $userEmail): array
+    {
+        /** @var array<string, mixed> $data */
+        $data = $this->serializer->normalize($userEmail, context: ['groups' => ['user:read']]);
+
+        return $data;
     }
 
     /**

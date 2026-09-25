@@ -7,6 +7,8 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
+use Symfony\Component\Serializer\Attribute\Groups;
+use Symfony\Component\Serializer\Attribute\MaxDepth;
 use Symfony\Component\Validator\Constraints as Assert;
 
 /**
@@ -29,9 +31,11 @@ class Permission
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'integer')]
+    #[Groups(['permission:read'])]
     private ?int $id = null;
 
     #[ORM\Column(type: 'string', length: 100, unique: true)]
+    #[Groups(['permission:read'])]
     #[Assert\NotBlank(message: 'Le nom de la permission est obligatoire.')]
     #[Assert\Regex(
         pattern: '/^[a-z0-9]+(?:\.[a-z0-9]+)+$/',
@@ -40,6 +44,7 @@ class Permission
     private ?string $name = null;
 
     #[ORM\Column(type: 'string', length: 255)]
+    #[Groups(['permission:read'])]
     #[Assert\NotBlank(message: 'Le libellé est obligatoire.')]
     private ?string $label = null;
 
@@ -59,6 +64,13 @@ class Permission
     #[ORM\JoinTable(name: 'permission_implication')]
     #[ORM\JoinColumn(name: 'permission_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
     #[ORM\InverseJoinColumn(name: 'implied_permission_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    #[Groups(['permission:read'])]
+    // MaxDepth(1) : affiche les permissions directement impliquées, mais pas
+    // les leurs (pas de récursion infinie côté sérialisation — le catalogue
+    // pourrait techniquement contenir un cycle, voir collectRoles() qui, lui,
+    // s'en protège différemment). Nécessite le contexte ENABLE_MAX_DEPTH,
+    // voir chaque appel à normalize() dans les controllers.
+    #[MaxDepth(1)]
     private Collection $impliedPermissions;
 
     public function __construct()

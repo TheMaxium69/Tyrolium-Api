@@ -8,6 +8,7 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Security\Core\User\UserInterface;
+use Symfony\Component\Serializer\Attribute\Groups;
 
 /**
  * Identifiant d'un système tiers (TyroServ, Gamenium, site client...) — voir
@@ -36,15 +37,19 @@ class ApiKey implements UserInterface
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'integer')]
+    #[Groups(['api_key:read'])]
     private ?int $id = null;
 
     #[ORM\Column(type: 'string', length: 255)]
+    #[Groups(['api_key:read'])]
     private ?string $label = null;
 
     #[ORM\Column(type: 'text', nullable: true)]
+    #[Groups(['api_key:read'])]
     private ?string $content = null;
 
     #[ORM\Column(type: 'string', length: 20, enumType: ApiKeyEnvironment::class)]
+    #[Groups(['api_key:read'])]
     private ApiKeyEnvironment $environment = ApiKeyEnvironment::TEST;
 
     /**
@@ -59,25 +64,31 @@ class ApiKey implements UserInterface
      * pour reconnaître la clé dans une liste, pas assez pour l'utiliser.
      */
     #[ORM\Column(type: 'string', length: 40)]
+    #[Groups(['api_key:read'])]
     private ?string $keyPreview = null;
 
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    #[Groups(['api_key:read'])]
     private ?\DateTimeImmutable $expiresAt = null;
 
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    #[Groups(['api_key:read'])]
     private ?\DateTimeImmutable $revokedAt = null;
 
     #[ORM\ManyToOne(targetEntity: User::class)]
     #[ORM\JoinColumn(name: 'created_by_id', referencedColumnName: 'id', nullable: false, onDelete: 'RESTRICT')]
+    #[Groups(['api_key:read'])]
     private ?User $createdBy = null;
 
     #[ORM\Column(type: 'datetime_immutable')]
+    #[Groups(['api_key:read'])]
     private \DateTimeImmutable $createdAt;
 
     /**
      * @var Collection<int, ApiKeyPermission>
      */
     #[ORM\OneToMany(targetEntity: ApiKeyPermission::class, mappedBy: 'apiKey', cascade: ['remove'], orphanRemoval: true)]
+    #[Groups(['api_key:read'])]
     private Collection $permissions;
 
     public function __construct()
@@ -178,6 +189,7 @@ class ApiKey implements UserInterface
         return null !== $this->revokedAt;
     }
 
+    #[Groups(['api_key:read'])]
     public function isExpired(): bool
     {
         return null !== $this->expiresAt && $this->expiresAt <= new \DateTimeImmutable();

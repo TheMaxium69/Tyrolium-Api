@@ -4,7 +4,6 @@ namespace App\Controller\Tyrolium;
 
 use App\Entity\ApiKey;
 use App\Entity\ApiKeyPermission;
-use App\Entity\Permission;
 use App\Entity\User;
 use App\Enum\ApiKeyEnvironment;
 use App\Repository\ApiKeyPermissionRepository;
@@ -18,6 +17,8 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
+use Symfony\Component\Serializer\Normalizer\AbstractObjectNormalizer;
+use Symfony\Component\Serializer\Normalizer\NormalizerInterface;
 
 /**
  * Gestion des clés API (systèmes tiers : TyroServ, Gamenium, sites clients...)
@@ -36,6 +37,7 @@ class TyroliumApiKeyController extends AbstractController
         private readonly ApiKeyRepository $apiKeyRepository,
         private readonly ApiKeyPermissionRepository $apiKeyPermissionRepository,
         private readonly PermissionRepository $permissionRepository,
+        private readonly NormalizerInterface $serializer,
     ) {
     }
 
@@ -43,7 +45,7 @@ class TyroliumApiKeyController extends AbstractController
     public function getAllKey(): JsonResponse
     {
         $keys = array_map(
-            fn (ApiKey $apiKey): array => $this->serializeApiKey($apiKey),
+            fn (ApiKey $apiKey): array => $this->normalizeApiKey($apiKey),
             $this->apiKeyRepository->findAll(),
         );
 
@@ -59,7 +61,7 @@ class TyroliumApiKeyController extends AbstractController
             return apiError('Clé API introuvable.', 404);
         }
 
-        return apiSuccess(data: $this->serializeApiKey($apiKey));
+        return apiSuccess(data: $this->normalizeApiKey($apiKey));
     }
 
     /**
@@ -119,7 +121,7 @@ class TyroliumApiKeyController extends AbstractController
             return apiError('Une clé identique existe déjà, réessaie.', 409);
         }
 
-        $data = $this->serializeApiKey($apiKey);
+        $data = $this->normalizeApiKey($apiKey);
         $data['key'] = $rawKey;
 
         return apiSuccess(data: $data, message: 'Clé créée — copie-la maintenant, elle ne sera plus jamais affichée.', code: 201);
@@ -180,7 +182,7 @@ class TyroliumApiKeyController extends AbstractController
             return apiError('Cette clé a déjà cette permission.', 409);
         }
 
-        return apiSuccess(data: $this->serializeApiKeyPermission($apiKeyPermission), message: 'Permission accordée.', code: 201);
+        return apiSuccess(data: $this->normalizeApiKeyPermission($apiKeyPermission), message: 'Permission accordée.', code: 201);
     }
 
     #[Route('/tyrolium/api-key/delete-key-permission/{id}', name: 'tyrolium_api_key_delete_key_permission', methods: ['DELETE'])]
@@ -201,43 +203,28 @@ class TyroliumApiKeyController extends AbstractController
     /**
      * @return array<string, mixed>
      */
-    private function serializeApiKey(ApiKey $apiKey): array
+    private function normalizeApiKey(ApiKey $apiKey): array
     {
-        return [
-            'id' => $apiKey->getId(),
-            'label' => $apiKey->getLabel(),
-            'content' => $apiKey->getContent(),
-            'environment' => $apiKey->getEnvironment()->value,
-            'keyPreview' => $apiKey->getKeyPreview(),
-            'expiresAt' => $apiKey->getExpiresAt()?->format(DATE_ATOM),
-            'isExpired' => $apiKey->isExpired(),
-            'revokedAt' => $apiKey->getRevokedAt()?->format(DATE_ATOM),
-            'createdBy' => $apiKey->getCreatedBy()?->getUsername(),
-            'createdAt' => $apiKey->getCreatedAt()->format(DATE_ATOM),
-            'permissions' => array_map(
-                fn (ApiKeyPermission $p): array => $this->serializeApiKeyPermission($p),
-                $apiKey->getPermissions()->toArray(),
-            ),
-        ];
+        /** @var array<string, mixed> $data */
+        $data = $this->serializer->normalize($apiKey, context: [
+            'groups' => ['api_key:read', 'api_key_permission:read', 'permission:read', 'user:identifier'],
+            AbstractObjectNormalizer::ENABLE_MAX_DEPTH => true,
+        ]);
+
+        return $data;
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function serializeApiKeyPermission(ApiKeyPermission $apiKeyPermission): array
+    private function normalizeApiKeyPermission(ApiKeyPermission $apiKeyPermission): array
     {
-        $permission = $apiKeyPermission->getPermission()
-            ?? throw new \LogicException('Une ApiKeyPermission persistée doit toujours avoir une Permission (colonne NOT NULL).');
+        /** @var array<string, mixed> $data */
+        $data = $this->serializer->normalize($apiKeyPermission, context: [
+            'groups' => ['api_key_permission:read', 'permission:read', 'user:identifier'],
+            AbstractObjectNormalizer::ENABLE_MAX_DEPTH => true,
+        ]);
 
-        return [
-            'id' => $apiKeyPermission->getId(),
-            'permission' => [
-                'id' => $permission->getId(),
-                'name' => $permission->getName(),
-                'label' => $permission->getLabel(),
-            ],
-            'grantedBy' => $apiKeyPermission->getGrantedBy()?->getUsername(),
-            'grantedAt' => $apiKeyPermission->getGrantedAt()->format(DATE_ATOM),
-        ];
+        return $data;
     }
 }

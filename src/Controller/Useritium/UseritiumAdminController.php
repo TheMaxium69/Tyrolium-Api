@@ -8,6 +8,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
+use Symfony\Component\Serializer\Normalizer\NormalizerInterface;
 
 /**
  * Administration des comptes Useritium — voir cahier des charges
@@ -20,6 +21,7 @@ class UseritiumAdminController extends AbstractController
 {
     public function __construct(
         private readonly UserRepository $userRepository,
+        private readonly NormalizerInterface $serializer,
     ) {
     }
 
@@ -32,7 +34,7 @@ class UseritiumAdminController extends AbstractController
     public function getAllUser(): JsonResponse
     {
         $users = array_map(
-            fn (User $user): array => $this->serializeUser($user),
+            fn (User $user): array => $this->normalizeUser($user),
             $this->userRepository->findAll(),
         );
 
@@ -42,22 +44,11 @@ class UseritiumAdminController extends AbstractController
     /**
      * @return array<string, mixed>
      */
-    private function serializeUser(User $user): array
+    private function normalizeUser(User $user): array
     {
-        return [
-            'id' => $user->getId(),
-            'username' => $user->getUsername(),
-            'accessLevel' => $user->getAccessLevel()->value,
-            'emails' => array_map(
-                static fn ($email): array => [
-                    'id' => $email->getId(),
-                    'email' => $email->getEmail(),
-                    'isDefault' => $email->isDefault(),
-                    'isVerified' => $email->isVerified(),
-                ],
-                $user->getEmails()->toArray(),
-            ),
-            'createdAt' => $user->getCreatedAt()->format(DATE_ATOM),
-        ];
+        /** @var array<string, mixed> $data */
+        $data = $this->serializer->normalize($user, context: ['groups' => ['user:read']]);
+
+        return $data;
     }
 }
