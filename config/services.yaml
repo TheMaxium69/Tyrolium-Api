@@ -38,3 +38,14 @@ services:
             $prefix: 'PERMS_'
         tags:
             - { name: security.voter }
+
+    # Extrait le header "X-Api-Key" (pas "Authorization: Bearer", réservé au
+    # JWT des comptes Useritium) — même classe Symfony que celle utilisée par
+    # défaut pour Authorization/Bearer, reconfigurée avec un header et un
+    # type de token différents. Voir config/packages/security.yaml
+    # (firewall api > access_token) et .doc/permissions.md.
+    app.security.api_key_extractor:
+        class: Symfony\Component\Security\Http\AccessToken\HeaderAccessTokenExtractor
+        arguments:
+            $headerParameter: 'X-Api-Key'
+            $tokenType: ''

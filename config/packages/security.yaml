@@ -29,6 +29,14 @@ security:
                 password_path: password
                 success_handler: App\Security\AuthenticationSuccessHandler
                 failure_handler: App\Security\AuthenticationFailureHandler
+            # Auth par clé API (header X-Api-Key, PAS Authorization/Bearer —
+            # réservé aux comptes Useritium) — voir ApiKeyTokenHandler,
+            # app.security.api_key_extractor (config/services.yaml) et
+            # .doc/permissions.md. Coexiste avec jwt/json_login ci-dessus :
+            # chaque mécanisme ne s'active que si son propre header est présent.
+            access_token:
+                token_handler: App\Security\ApiKeyTokenHandler
+                token_extractors: app.security.api_key_extractor
 
     # Note: Only the *first* matching rule is applied
     access_control:

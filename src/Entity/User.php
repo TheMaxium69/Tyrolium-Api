@@ -71,8 +71,12 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(type: 'string', length: 20, enumType: AccessLevel::class, options: ['default' => 'user'])]
     private AccessLevel $accessLevel = AccessLevel::USER;
 
+    #[ORM\Column(type: 'datetime_immutable')]
+    private \DateTimeImmutable $createdAt;
+
     public function __construct()
     {
+        $this->createdAt = new \DateTimeImmutable();
         $this->emails = new ArrayCollection();
         $this->permissions = new ArrayCollection();
     }
@@ -162,6 +166,11 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $this->accessLevel = $accessLevel;
 
         return $this;
+    }
+
+    public function getCreatedAt(): \DateTimeImmutable
+    {
+        return $this->createdAt;
     }
 
     public function getResetToken(): ?string
