@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Enum\AccessLevel;
 use App\Repository\UserRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -55,9 +56,25 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups(['user:read'])]
     private Collection $emails;
 
+    /**
+     * @var Collection<int, UserPermission>
+     */
+    #[ORM\OneToMany(targetEntity: UserPermission::class, mappedBy: 'user', cascade: ['remove'], orphanRemoval: true)]
+    private Collection $permissions;
+
+    /**
+     * Porte d'entrée du système de permissions — voir App\Enum\AccessLevel.
+     * `user` (défaut) : jamais aucune permission, quoi qu'il y ait dans
+     * `permissions` ci-dessus. `owner` n'est jamais mis via ce champ par
+     * l'API/CLI, uniquement en DB directement par Maxime.
+     */
+    #[ORM\Column(type: 'string', length: 20, enumType: AccessLevel::class, options: ['default' => 'user'])]
+    private AccessLevel $accessLevel = AccessLevel::USER;
+
     public function __construct()
     {
         $this->emails = new ArrayCollection();
+        $this->permissions = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -99,12 +116,52 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     }
 
     /**
+     * ROLE_USER toujours présent (client/public). ROLE_INTERNE + les rôles
+     * "PERMS_..." des permissions RBAC accordées (Permission::toRole()) ne
+     * sont ajoutés que si $accessLevel n'est plus USER — voir
+     * App\Enum\AccessLevel et .doc/permissions.md : les lignes de la
+     * collection `permissions` d'un compte accessLevel=user ne comptent
+     * jamais, même si elles existent en DB (ex: après une rétrogradation
+     * interne → user, sans suppression des UserPermission historiques).
+     * ROLE_OWNER est ajouté en plus mais ne suffit pas à lui seul pour le
+     * bypass absolu : voir App\Security\OwnerBypassVoter, RoleVoter exige
+     * une correspondance exacte par attribut, pas de hiérarchie implicite.
+     *
      * @return list<string>
      */
     public function getRoles(): array
     {
-        // TODO: backed by a real column once role differentiation (RBAC) is needed.
-        return ['ROLE_USER'];
+        $roles = ['ROLE_USER'];
+
+        if (AccessLevel::USER !== $this->accessLevel) {
+            $roles[] = 'ROLE_INTERNE';
+
+            foreach ($this->permissions as $userPermission) {
+                $permission = $userPermission->getPermission()
+                    ?? throw new \LogicException('Une UserPermission persistée doit toujours avoir une Permission (colonne NOT NULL).');
+                // collectRoles() déplie aussi les permissions "parapluie"
+                // implicitement liées (Permission::$impliedPermissions).
+                $roles = array_merge($roles, $permission->collectRoles());
+            }
+        }
+
+        if (AccessLevel::OWNER === $this->accessLevel) {
+            $roles[] = 'ROLE_OWNER';
+        }
+
+        return array_values(array_unique($roles));
+    }
+
+    public function getAccessLevel(): AccessLevel
+    {
+        return $this->accessLevel;
+    }
+
+    public function setAccessLevel(AccessLevel $accessLevel): static
+    {
+        $this->accessLevel = $accessLevel;
+
+        return $this;
     }
 
     public function getResetToken(): ?string
@@ -205,5 +262,13 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $defaultEmail = $this->getDefaultEmail();
 
         return null !== $defaultEmail && $defaultEmail->isVerified();
+    }
+
+    /**
+     * @return Collection<int, UserPermission>
+     */
+    public function getPermissions(): Collection
+    {
+        return $this->permissions;
     }
 }

@@ -87,7 +87,7 @@ APP_ENV=dev php -S 127.0.0.1:8000 -t public
 Ou sous Apache/Docker (voir `.doc/env-files.md` section 2.4 pour le détail) :
 
 ```bash
-docker compose up -d database app              # dev — http://127.0.0.1:8080
+docker compose up -d database app              # dev — http://127.0.0.1:8000
 APP_ENV=prod docker compose up -d database app  # prod
 ```
 
@@ -98,11 +98,13 @@ config/
   packages/        # config par bundle (security, rate_limiter, nelmio_cors, doctrine...)
   secrets/         # Symfony Secrets Vault (par environnement)
 src/
-  Controller/      # controllers métier, un dossier par namespace (Useritium/, Tyrolium/, SolidServ/...) — seul Useritium/UseritiumAccountController.php existe pour l'instant
-  Controller/Debug/  # controllers de scratch, routes actives en dev uniquement — à recréer
-  Entity/          # entités Doctrine — User, UserEmail
-  Repository/      # repositories Doctrine — UserRepository, UserEmailRepository
-  Security/        # UserProvider, UserChecker, Authentication{Success,Failure}Handler
+  Controller/      # controllers métier, un dossier par namespace (Useritium/, Tyrolium/, SolidServ/...)
+    Useritium/     # UseritiumAccountController (compte, auth JWT)
+    Tyrolium/      # TyroliumPermissionController (RBAC)
+  Entity/          # entités Doctrine — User, UserEmail, Permission, UserPermission (jamais triées par namespace, contrairement aux Controller)
+  Repository/      # repositories Doctrine — UserRepository, UserEmailRepository, PermissionRepository, UserPermissionRepository
+  Security/        # UserProvider, UserChecker, Authentication{Success,Failure}Handler, OwnerBypassVoter (RBAC)
+  Enum/            # AccessLevel (user/interne/owner — voir .doc/permissions.md)
   EventSubscriber/ # ApiRateLimitSubscriber
   Helper/          # ApiResponseHelper (fonctions globales, hors PSR-4)
 migrations/        # migrations Doctrine — 4 migrations (users, user_email)
@@ -158,7 +160,8 @@ Pas de job de formatage/CS-Fixer — le style de code n'est volontairement pas v
 ## État du projet / roadmap
 
 - [x] Entités `User`/`UserEmail`, provider/authenticator JWT (`App\Security\*`), `UseritiumAccountController` — repris et re-testés en réel (register/verify/login/JWT) le 22/09/2026
-- [ ] Recréer les autres controllers métier (`Useritium/{Oauth,Sso,Dashboard,Drive,Admin}`, `Tyrolium/`, `SolidServ/`...) — voir `.doc/cahier-des-charges.md`
+- [x] `TyroliumPermissionController` (RBAC) — catalogue de permissions + attribution, testé en réel le 25/09/2026, voir `.doc/permissions.md`
+- [ ] Recréer les autres controllers métier (`Useritium/{Oauth,Sso,Dashboard,Drive,Admin}`, `Tyrolium/{Analytics,Prestation,WebSite,Support,ApiKey}`, `SolidServ/`...) — voir `.doc/cahier-des-charges.md`
 - [ ] `access_control` par rôle une fois de vrais controllers métier en place
 - [ ] Auth déléguée OAuth2 (`league/oauth2-server-bundle`) pour les systèmes tiers (Odoo...)
 - [ ] Refonte SSO cross-domaine (Authorization Code + PKCE) pour remplacer le mécanisme legacy

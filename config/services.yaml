@@ -19,7 +19,6 @@ services:
     App\:
         resource: '../src/'
         exclude:
-            - '../src/Controller/Debug/'
             # Plain global functions (composer.json "autoload.files"), not a DI-managed
             # class — the container's directory scan otherwise expects every file under
             # src/ to declare a class matching its PSR-4 path.
@@ -28,11 +27,14 @@ services:
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
 
-when@dev:
-    services:
-        # Debug-only controllers: excluded from App\ above, re-registered here so
-        # their routes only exist (and are only reachable) in the dev environment.
-        App\Controller\Debug\:
-            resource: '../src/Controller/Debug/'
-            autowire: true
-            autoconfigure: true
+    # Deuxième instance de Symfony\...\RoleVoter (la même classe que celle déjà
+    # enregistrée par défaut par security-bundle pour "ROLE_"), configurée avec
+    # le préfixe "PERMS_" — permet à Permission::toRole() d'utiliser un préfixe
+    # distinct de ROLE_USER/ROLE_INTERNE/ROLE_OWNER sans écrire de Voter custom.
+    # Voir .doc/permissions.md.
+    app.security.voter.permission:
+        class: Symfony\Component\Security\Core\Authorization\Voter\RoleVoter
+        arguments:
+            $prefix: 'PERMS_'
+        tags:
+            - { name: security.voter }
