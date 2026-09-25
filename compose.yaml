@@ -50,7 +50,7 @@ services:
       APP_SECRET: ${APP_SECRET:-0fdee7da668dc743fdb14a757d98ec64}
       JWT_PASSPHRASE: ${JWT_PASSPHRASE:-8b870bb67d45f0166554487ad19b98569b56edee4adf215e05ee3e959d57d02d}
     ports:
-      - "${APP_HTTP_PORT:-8080}:80"
+      - "${APP_HTTP_PORT:-8000}:80"
     volumes:
       # vendor/ et var/ restent dans le bind-mount (partagés avec l'hôte) : un
       # volume nommé imbriqué dessous empêcherait composer/Symfony de recréer

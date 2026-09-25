@@ -189,6 +189,11 @@ class UseritiumAccountController extends AbstractController
         }
 
         $user->setPassword($this->passwordHasher->hashPassword($user, $newPassword));
+        // Un reset de mot de passe doit aussi révoquer les JWT déjà émis (ex: token
+        // volé) — sinon un attaquant garde l'accès jusqu'à expiration naturelle du
+        // token malgré le changement de mot de passe. Même mécanisme que
+        // postLogoutAllDevices().
+        $user->invalidateAllTokens();
         $user->clearResetToken();
         $this->entityManager->flush();
 
