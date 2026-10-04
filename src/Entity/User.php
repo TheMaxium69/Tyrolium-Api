@@ -11,6 +11,7 @@ use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\Serializer\Attribute\Groups;
+use Symfony\Component\Serializer\Attribute\SerializedName;
 use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: UserRepository::class)]
@@ -18,10 +19,12 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[UniqueEntity(fields: ['username'], message: "Ce nom d'utilisateur est déjà utilisé.")]
 class User implements UserInterface, PasswordAuthenticatedUserInterface
 {
+    public const MAX_EMAILS_PER_USER = 5;
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'integer')]
-    #[Groups(['user:read'])]
+    #[Groups(['user:read', 'user:identifier', 'user:card'])]
     private ?int $id = null;
 
     #[ORM\Column(type: 'string', length: 180, unique: true)]
@@ -30,10 +33,18 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     // dans le projet) sans jamais entraîner les emails via "user:read" —
     // "user:read" reste réservé aux endpoints qui affichent vraiment un
     // profil complet (ex: UseritiumAdminController::getAllUser()).
-    #[Groups(['user:read', 'user:identifier'])]
+    #[Groups(['user:read', 'user:identifier', 'user:card'])]
     #[Assert\NotBlank(message: "Le nom d'utilisateur est obligatoire.")]
     #[Assert\Length(min: 3, max: 180, minMessage: "Le nom d'utilisateur doit contenir au moins 3 caractères.", maxMessage: "Le nom d'utilisateur ne peut pas dépasser 180 caractères.")]
     private ?string $username = null;
+
+    /**
+     * Nom affiché à la place du username quand il est renseigné (null = afficher le username).
+     */
+    #[ORM\Column(type: 'string', length: 100, nullable: true)]
+    #[Groups(['user:read', 'user:identifier', 'user:card'])]
+    #[Assert\Length(max: 100, maxMessage: "Le nom affiché ne peut pas dépasser 100 caractères.")]
+    private ?string $displayName = null;
 
     #[ORM\Column(type: 'string', length: 255)]
     #[Assert\NotBlank(message: "Le mot de passe est obligatoire.")]
@@ -52,13 +63,25 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
      * restriction, comportement normal.
      */
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    #[Groups(['user:admin'])]
     private ?\DateTimeImmutable $tokensValidSince = null;
+
+    /**
+     * Compte suspendu : login refusé et tokens invalidés (voir UserChecker).
+     */
+    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    #[Groups(['user:admin'])]
+    private ?\DateTimeImmutable $bannedAt = null;
+
+    #[ORM\Column(type: 'text', nullable: true)]
+    #[Groups(['user:admin'])]
+    private ?string $banReason = null;
 
     /**
      * @var Collection<int, UserEmail>
      */
     #[ORM\OneToMany(targetEntity: UserEmail::class, mappedBy: 'user', cascade: ['persist', 'remove'], orphanRemoval: true)]
-    #[Groups(['user:read'])]
+    #[Groups(['user:read', 'user:me'])]
     private Collection $emails;
 
     /**
@@ -76,6 +99,14 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(type: 'string', length: 20, enumType: AccessLevel::class, options: ['default' => 'user'])]
     #[Groups(['user:read', 'user:access'])]
     private AccessLevel $accessLevel = AccessLevel::USER;
+
+    /**
+     * Chemin relatif de la photo de profil (ex: /uploads/avatars/x.png), null si
+     * pas de photo — le front affiche son avatar par défaut dans ce cas.
+     */
+    #[ORM\Column(type: 'string', length: 255, nullable: true)]
+    #[Groups(['user:read', 'user:identifier', 'user:card'])]
+    private ?string $pp = null;
 
     #[ORM\Column(type: 'datetime_immutable')]
     #[Groups(['user:read'])]
@@ -96,6 +127,18 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function getUsername(): ?string
     {
         return $this->username;
+    }
+
+    public function getPp(): ?string
+    {
+        return $this->pp;
+    }
+
+    public function setPp(?string $pp): static
+    {
+        $this->pp = $pp;
+
+        return $this;
     }
 
     public function setUsername(string $username): static
@@ -216,6 +259,60 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     {
         $this->resetToken = null;
         $this->resetTokenExpiresAt = null;
+    }
+
+    public function getDisplayName(): ?string
+    {
+        return $this->displayName;
+    }
+
+    public function setDisplayName(?string $displayName): static
+    {
+        $this->displayName = $displayName;
+
+        return $this;
+    }
+
+    #[Groups(['user:card'])]
+    #[SerializedName('type')]
+    public function getCardType(): string
+    {
+        return AccessLevel::USER === $this->accessLevel ? 'public' : 'interne';
+    }
+
+    #[Groups(['user:card'])]
+    #[SerializedName('status')]
+    public function getCardStatus(): string
+    {
+        return $this->isBanned() ? 'banni' : 'actif';
+    }
+
+    public function isBanned(): bool
+    {
+        return null !== $this->bannedAt;
+    }
+
+    public function getBannedAt(): ?\DateTimeImmutable
+    {
+        return $this->bannedAt;
+    }
+
+    public function getBanReason(): ?string
+    {
+        return $this->banReason;
+    }
+
+    public function ban(?string $reason): void
+    {
+        $this->bannedAt = new \DateTimeImmutable();
+        $this->banReason = $reason;
+        $this->invalidateAllTokens();
+    }
+
+    public function unban(): void
+    {
+        $this->bannedAt = null;
+        $this->banReason = null;
     }
 
     public function getTokensValidSince(): ?\DateTimeImmutable

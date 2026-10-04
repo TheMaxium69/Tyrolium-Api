@@ -21,6 +21,9 @@ class UserChecker implements UserCheckerInterface
             return;
         }
 
+        if ($user->isBanned()) {
+            throw new CustomUserMessageAccountStatusException('Ce compte est suspendu.');
+        }
         if (!$user->hasVerifiedDefaultEmail()) {
             throw new CustomUserMessageAccountStatusException('Ton email par défaut n\'est pas encore vérifié. Vérifie ta boîte mail avant de te connecter.');
         }

@@ -16,7 +16,7 @@ class UserEmail
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'integer')]
-    #[Groups(['user:read'])]
+    #[Groups(['user:read', 'user:me'])]
     private ?int $id = null;
 
     #[ORM\ManyToOne(targetEntity: User::class, inversedBy: 'emails')]
@@ -24,22 +24,22 @@ class UserEmail
     private ?User $user = null;
 
     #[ORM\Column(type: 'string', length: 180)]
-    #[Groups(['user:read'])]
+    #[Groups(['user:read', 'user:me'])]
     #[Assert\NotBlank(message: "L'email est obligatoire.")]
     #[Assert\Email(message: "L'adresse email n'est pas valide.")]
     #[Assert\Length(max: 180, maxMessage: "L'email ne peut pas dépasser 180 caractères.")]
     private ?string $email = null;
 
     #[ORM\Column(type: 'boolean', options: ['default' => false])]
-    #[Groups(['user:read'])]
+    #[Groups(['user:read', 'user:me'])]
     private bool $isDefault = false;
 
     #[ORM\Column(type: 'boolean', options: ['default' => false])]
-    #[Groups(['user:read'])]
+    #[Groups(['user:read', 'user:me'])]
     private bool $isVerified = false;
 
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
-    #[Groups(['user:read'])]
+    #[Groups(['user:read', 'user:me'])]
     private ?\DateTimeImmutable $verifiedAt = null;
 
     #[ORM\Column(type: 'string', length: 64, nullable: true, unique: true)]
@@ -59,7 +59,7 @@ class UserEmail
     private ?\DateTimeImmutable $verificationTokenExpiresAt = null;
 
     #[ORM\Column(type: 'datetime_immutable')]
-    #[Groups(['user:read'])]
+    #[Groups(['user:read', 'user:me'])]
     private \DateTimeImmutable $createdAt;
 
     public function __construct()

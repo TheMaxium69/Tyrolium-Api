@@ -12,6 +12,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
@@ -33,7 +34,13 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
  */
 class UseritiumAccountController extends AbstractController
 {
-    private const MAX_EMAILS_PER_USER = 5;
+    private const AVATAR_MAX_BYTES = 2 * 1024 * 1024;
+
+    private const AVATAR_EXTENSIONS = [
+        'image/jpeg' => 'jpg',
+        'image/png' => 'png',
+        'image/webp' => 'webp',
+    ];
 
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
@@ -218,8 +225,8 @@ class UseritiumAccountController extends AbstractController
             return apiValidationError($violations, 'Email invalide.');
         }
 
-        if ($user->getEmails()->count() >= self::MAX_EMAILS_PER_USER) {
-            return apiError(sprintf('Un compte ne peut pas avoir plus de %d emails.', self::MAX_EMAILS_PER_USER), 409);
+        if ($user->getEmails()->count() >= User::MAX_EMAILS_PER_USER) {
+            return apiError(sprintf('Un compte ne peut pas avoir plus de %d emails.', User::MAX_EMAILS_PER_USER), 409);
         }
 
         foreach ($user->getEmails() as $existingEmail) {
@@ -319,6 +326,73 @@ class UseritiumAccountController extends AbstractController
         $this->entityManager->flush();
 
         return apiSuccess(message: 'Email supprimé.');
+    }
+
+    #[IsGranted('IS_AUTHENTICATED_FULLY')]
+    #[Route('/useritium/account/get-me', name: 'useritium_account_get_me', methods: ['GET'])]
+    public function getMe(#[CurrentUser] User $user): JsonResponse
+    {
+        /** @var array<string, mixed> $data */
+        $data = $this->serializer->normalize($user, context: ['groups' => ['user:identifier', 'user:me']]);
+
+        return apiSuccess(data: $data);
+    }
+
+    #[IsGranted('IS_AUTHENTICATED_FULLY')]
+    #[Route('/useritium/account/put-update-display-name', name: 'useritium_account_put_update_display_name', methods: ['PUT'])]
+    public function putUpdateDisplayName(Request $request, #[CurrentUser] User $user): JsonResponse
+    {
+        $payload = json_decode($request->getContent(), true) ?? [];
+        if (!array_key_exists('displayName', $payload) || (null !== $payload['displayName'] && !is_string($payload['displayName']))) {
+            return apiError('displayName doit être une chaîne ou null.', 400);
+        }
+
+        $displayName = null !== $payload['displayName'] ? trim($payload['displayName']) : null;
+        $user->setDisplayName('' === $displayName ? null : $displayName);
+
+        $violations = $this->validator->validate($user);
+        if (count($violations) > 0) {
+            return apiValidationError($violations, 'Nom affiché invalide.');
+        }
+
+        $this->entityManager->flush();
+
+        return apiSuccess(data: $this->normalizeUser($user), message: 'Nom affiché mis à jour.');
+    }
+
+    #[IsGranted('IS_AUTHENTICATED_FULLY')]
+    #[Route('/useritium/account/post-upload-avatar', name: 'useritium_account_post_upload_avatar', methods: ['POST'])]
+    public function postUploadAvatar(Request $request, #[CurrentUser] User $user): JsonResponse
+    {
+        $file = $request->files->get('avatar');
+        if (!$file instanceof UploadedFile || !$file->isValid()) {
+            return apiError('Fichier "avatar" manquant ou invalide.', 400);
+        }
+
+        if ($file->getSize() > self::AVATAR_MAX_BYTES) {
+            return apiError('Image trop lourde (2 Mo maximum).', 422);
+        }
+
+        $imageInfo = getimagesize($file->getPathname());
+        $extension = self::AVATAR_EXTENSIONS[$imageInfo['mime'] ?? ''] ?? null;
+        if (false === $imageInfo || null === $extension) {
+            return apiError('Image invalide : formats acceptés jpeg, png, webp.', 422);
+        }
+
+        $directory = $this->getParameter('kernel.project_dir').'/public/uploads/avatars';
+        $filename = bin2hex(random_bytes(16)).'.'.$extension;
+        $file->move($directory, $filename);
+
+        $previous = $user->getPp();
+        $previousPath = null !== $previous ? $this->getParameter('kernel.project_dir').'/public'.$previous : null;
+        if (null !== $previousPath && is_file($previousPath)) {
+            unlink($previousPath);
+        }
+
+        $user->setPp('/uploads/avatars/'.$filename);
+        $this->entityManager->flush();
+
+        return apiSuccess(data: $this->normalizeUser($user), message: 'Photo de profil mise à jour.');
     }
 
     /**

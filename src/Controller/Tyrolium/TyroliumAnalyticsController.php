@@ -5,6 +5,7 @@ namespace App\Controller\Tyrolium;
 use App\Entity\AnalyticsInput;
 use App\Entity\AnalyticsProject;
 use App\Entity\User;
+use App\Helper\Pagination;
 use App\Repository\AnalyticsInputRepository;
 use App\Repository\AnalyticsProjectRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -75,14 +76,17 @@ class TyroliumAnalyticsController extends AbstractController
 
     #[IsGranted('PERMS_TYROLIUM_ANALYTICS_VIEW')]
     #[Route('/tyrolium/analytics/get-all-project', name: 'tyrolium_analytics_get_all_project', methods: ['GET'])]
-    public function getAllProject(): JsonResponse
+    public function getAllProject(Request $request): JsonResponse
     {
-        $projects = array_map(
-            fn (AnalyticsProject $project): array => $this->normalizeProject($project),
-            $this->projectRepository->findAll(),
+        $result = Pagination::fromQueryBuilder(
+            $this->projectRepository->createQueryBuilder('p')->orderBy('p.id', 'ASC'),
+            $request,
         );
 
-        return apiSuccess(data: $projects);
+        return apiSuccess(
+            data: array_map(fn (AnalyticsProject $project): array => $this->normalizeProject($project), $result['items']),
+            meta: ['pagination' => $result['pagination']],
+        );
     }
 
     #[IsGranted('PERMS_TYROLIUM_ANALYTICS_VIEW')]
@@ -125,6 +129,26 @@ class TyroliumAnalyticsController extends AbstractController
         return apiSuccess(data: $this->normalizeProject($project), message: 'Domaine ajouté au projet analytics.');
     }
 
+    #[IsGranted('PERMS_TYROLIUM_ANALYTICS_UPDATE')]
+    #[Route('/tyrolium/analytics/put-update-project-description/{id}', name: 'tyrolium_analytics_put_update_project_description', methods: ['PUT'])]
+    public function putUpdateProjectDescription(int $id, Request $request): JsonResponse
+    {
+        $project = $this->projectRepository->find($id);
+        if (null === $project) {
+            return apiError('Projet analytics introuvable.', 404);
+        }
+
+        $payload = json_decode($request->getContent(), true) ?? [];
+        if (!array_key_exists('description', $payload) || (null !== $payload['description'] && !is_string($payload['description']))) {
+            return apiError('description doit être une chaîne ou null.', 400);
+        }
+
+        $project->setDescription($payload['description']);
+        $this->entityManager->flush();
+
+        return apiSuccess(data: $this->normalizeProject($project), message: 'Description mise à jour.');
+    }
+
     #[IsGranted('PERMS_TYROLIUM_ANALYTICS_DELETE')]
     #[Route('/tyrolium/analytics/delete-project/{id}', name: 'tyrolium_analytics_delete_project', methods: ['DELETE'])]
     public function deleteProject(int $id): JsonResponse
@@ -165,7 +189,7 @@ class TyroliumAnalyticsController extends AbstractController
 
         $input = new AnalyticsInput();
         $input->setProject($project);
-        $input->setIp(is_string($payload['ip'] ?? null) ? $payload['ip'] : '');
+        $input->setIp((string) $request->getClientIp());
         $input->setPageName(is_string($payload['pageName'] ?? null) ? $payload['pageName'] : '');
         $input->setUri(is_string($payload['uri'] ?? null) ? $payload['uri'] : '');
         $input->setIsLogin($isLogin);
@@ -182,15 +206,44 @@ class TyroliumAnalyticsController extends AbstractController
     }
 
     #[IsGranted('PERMS_TYROLIUM_ANALYTICS_VIEW')]
-    #[Route('/tyrolium/analytics/get-all-input', name: 'tyrolium_analytics_get_all_input', methods: ['GET'])]
-    public function getAllInput(): JsonResponse
+    #[Route('/tyrolium/analytics/get-stats-global', name: 'tyrolium_analytics_get_stats_global', methods: ['GET'])]
+    public function getStatsGlobal(Request $request): JsonResponse
     {
-        $inputs = array_map(
-            fn (AnalyticsInput $input): array => $this->normalizeInput($input),
-            $this->inputRepository->findByFilters([]),
-        );
+        $period = $this->parsePeriod($request);
+        if ($period instanceof JsonResponse) {
+            return $period;
+        }
 
-        return apiSuccess(data: $inputs);
+        return apiSuccess(data: $this->inputRepository->computeStats(null, ...$period));
+    }
+
+    #[IsGranted('PERMS_TYROLIUM_ANALYTICS_VIEW')]
+    #[Route('/tyrolium/analytics/get-stats-project/{id}', name: 'tyrolium_analytics_get_stats_project', methods: ['GET'])]
+    public function getStatsProject(int $id, Request $request): JsonResponse
+    {
+        $project = $this->projectRepository->find($id);
+        if (null === $project) {
+            return apiError('Projet analytics introuvable.', 404);
+        }
+
+        $period = $this->parsePeriod($request);
+        if ($period instanceof JsonResponse) {
+            return $period;
+        }
+
+        return apiSuccess(data: $this->inputRepository->computeStats($project, ...$period));
+    }
+
+    #[IsGranted('PERMS_TYROLIUM_ANALYTICS_VIEW')]
+    #[Route('/tyrolium/analytics/get-all-input', name: 'tyrolium_analytics_get_all_input', methods: ['GET'])]
+    public function getAllInput(Request $request): JsonResponse
+    {
+        $result = Pagination::fromQueryBuilder($this->inputRepository->filteredQueryBuilder([]), $request);
+
+        return apiSuccess(
+            data: array_map(fn (AnalyticsInput $input): array => $this->normalizeInput($input), $result['items']),
+            meta: ['pagination' => $result['pagination']],
+        );
     }
 
     #[IsGranted('PERMS_TYROLIUM_ANALYTICS_VIEW')]
@@ -206,34 +259,64 @@ class TyroliumAnalyticsController extends AbstractController
             }
         }
 
-        $inputs = array_map(
-            fn (AnalyticsInput $input): array => $this->normalizeInput($input),
-            $this->inputRepository->findByFilters([
-                'project' => $project,
-                'ip' => $request->query->get('ip'),
-                'pageName' => $request->query->get('pageName'),
-                'uri' => $request->query->get('uri'),
-            ]),
-        );
+        $result = Pagination::fromQueryBuilder($this->inputRepository->filteredQueryBuilder([
+            'project' => $project,
+            'ip' => $request->query->get('ip'),
+            'pageName' => $request->query->get('pageName'),
+            'uri' => $request->query->get('uri'),
+        ]), $request);
 
-        return apiSuccess(data: $inputs);
+        return apiSuccess(
+            data: array_map(fn (AnalyticsInput $input): array => $this->normalizeInput($input), $result['items']),
+            meta: ['pagination' => $result['pagination']],
+        );
     }
 
     #[IsGranted('PERMS_TYROLIUM_ANALYTICS_VIEW')]
     #[Route('/tyrolium/analytics/get-input-by-project/{id}', name: 'tyrolium_analytics_get_input_by_project', methods: ['GET'])]
-    public function getInputByProject(int $id): JsonResponse
+    public function getInputByProject(int $id, Request $request): JsonResponse
     {
         $project = $this->projectRepository->find($id);
         if (null === $project) {
             return apiError('Projet analytics introuvable.', 404);
         }
 
-        $inputs = array_map(
-            fn (AnalyticsInput $input): array => $this->normalizeInput($input),
-            $this->inputRepository->findByFilters(['project' => $project]),
-        );
+        $result = Pagination::fromQueryBuilder($this->inputRepository->filteredQueryBuilder(['project' => $project]), $request);
 
-        return apiSuccess(data: $inputs);
+        return apiSuccess(
+            data: array_map(fn (AnalyticsInput $input): array => $this->normalizeInput($input), $result['items']),
+            meta: ['pagination' => $result['pagination']],
+        );
+    }
+
+    /**
+     * @return array{0: ?\DateTimeImmutable, 1: ?\DateTimeImmutable}|JsonResponse
+     */
+    private function parsePeriod(Request $request): array|JsonResponse
+    {
+        $from = $this->parseDate($request->query->get('from'));
+        $to = $this->parseDate($request->query->get('to'));
+        if (false === $from || false === $to) {
+            return apiError('from et to doivent être au format AAAA-MM-JJ.', 400);
+        }
+        if (null !== $from && null !== $to && $from > $to) {
+            return apiError('from doit être antérieur ou égal à to.', 400);
+        }
+
+        return [$from, $to];
+    }
+
+    /**
+     * @return \DateTimeImmutable|null|false
+     */
+    private function parseDate(mixed $value): \DateTimeImmutable|null|false
+    {
+        if (null === $value || '' === $value) {
+            return null;
+        }
+        $date = \DateTimeImmutable::createFromFormat('!Y-m-d', (string) $value);
+
+        return false === $date || $date->format('Y-m-d') !== $value ? false : $date;
     }
 
     /**

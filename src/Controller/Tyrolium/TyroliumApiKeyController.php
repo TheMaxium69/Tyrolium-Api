@@ -6,6 +6,7 @@ use App\Entity\ApiKey;
 use App\Entity\ApiKeyPermission;
 use App\Entity\User;
 use App\Enum\ApiKeyEnvironment;
+use App\Helper\Pagination;
 use App\Repository\ApiKeyPermissionRepository;
 use App\Repository\ApiKeyRepository;
 use App\Repository\PermissionRepository;
@@ -42,14 +43,17 @@ class TyroliumApiKeyController extends AbstractController
     }
 
     #[Route('/tyrolium/api-key/get-all-key', name: 'tyrolium_api_key_get_all_key', methods: ['GET'])]
-    public function getAllKey(): JsonResponse
+    public function getAllKey(Request $request): JsonResponse
     {
-        $keys = array_map(
-            fn (ApiKey $apiKey): array => $this->normalizeApiKey($apiKey),
-            $this->apiKeyRepository->findAll(),
+        $result = Pagination::fromQueryBuilder(
+            $this->apiKeyRepository->createQueryBuilder('k')->orderBy('k.id', 'ASC'),
+            $request,
         );
 
-        return apiSuccess(data: $keys);
+        return apiSuccess(
+            data: array_map(fn (ApiKey $apiKey): array => $this->normalizeApiKey($apiKey), $result['items']),
+            meta: ['pagination' => $result['pagination']],
+        );
     }
 
     #[Route('/tyrolium/api-key/get-one-key/{id}', name: 'tyrolium_api_key_get_one_key', methods: ['GET'])]

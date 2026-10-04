@@ -11,10 +11,9 @@ use Symfony\Component\Validator\Constraints as Assert;
 /**
  * Lien entre une Offre (catalogue) et un client — voir Offre.php pour la
  * séparation catalogue/attribution. Un client peut ne pas avoir de compte
- * Useritium ($user null) : $clientName/$clientEmail servent alors de repli
- * (décision de Maxime, 26/09/2026). Au moins l'un des deux (user OU
- * clientName+clientEmail) doit être renseigné — pas contraint au niveau de
- * l'entité (laissé à la validation du controller, à écrire).
+ * Useritium ($user null) : $clientName sert alors de repli, $clientEmail est
+ * facultatif. Au moins l'un des deux (user OU clientName) doit être renseigné —
+ * pas contraint au niveau de l'entité (validé par le controller).
  */
 #[ORM\Entity(repositoryClass: PrestationRepository::class)]
 #[ORM\Table(name: 'prestation')]

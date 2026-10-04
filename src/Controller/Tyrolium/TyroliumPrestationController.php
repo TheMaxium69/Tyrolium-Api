@@ -7,6 +7,7 @@ use App\Entity\Prestation;
 use App\Entity\User;
 use App\Enum\OffreVisibility;
 use App\Enum\PrestationStatus;
+use App\Helper\Pagination;
 use App\Repository\OffreRepository;
 use App\Repository\PrestationRepository;
 use App\Repository\UserRepository;
@@ -51,14 +52,17 @@ class TyroliumPrestationController extends AbstractController
 
     #[IsGranted('PERMS_TYROLIUM_OFFRE_VIEW')]
     #[Route('/tyrolium/prestation/get-all-offre', name: 'tyrolium_prestation_get_all_offre', methods: ['GET'])]
-    public function getAllOffre(): JsonResponse
+    public function getAllOffre(Request $request): JsonResponse
     {
-        $offres = array_map(
-            fn (Offre $offre): array => $this->normalizeOffre($offre),
-            $this->offreRepository->findAll(),
+        $result = Pagination::fromQueryBuilder(
+            $this->offreRepository->createQueryBuilder('o')->orderBy('o.id', 'ASC'),
+            $request,
         );
 
-        return apiSuccess(data: $offres);
+        return apiSuccess(
+            data: array_map(fn (Offre $offre): array => $this->normalizeOffre($offre), $result['items']),
+            meta: ['pagination' => $result['pagination']],
+        );
     }
 
     #[IsGranted('PERMS_TYROLIUM_OFFRE_VIEW')]
@@ -215,14 +219,17 @@ class TyroliumPrestationController extends AbstractController
 
     #[IsGranted('PERMS_TYROLIUM_PRESTATION_VIEW')]
     #[Route('/tyrolium/prestation/get-all-prestation', name: 'tyrolium_prestation_get_all_prestation', methods: ['GET'])]
-    public function getAllPrestation(): JsonResponse
+    public function getAllPrestation(Request $request): JsonResponse
     {
-        $prestations = array_map(
-            fn (Prestation $prestation): array => $this->normalizePrestation($prestation),
-            $this->prestationRepository->findAll(),
+        $result = Pagination::fromQueryBuilder(
+            $this->prestationRepository->createQueryBuilder('p')->orderBy('p.id', 'ASC'),
+            $request,
         );
 
-        return apiSuccess(data: $prestations);
+        return apiSuccess(
+            data: array_map(fn (Prestation $prestation): array => $this->normalizePrestation($prestation), $result['items']),
+            meta: ['pagination' => $result['pagination']],
+        );
     }
 
     #[IsGranted('PERMS_TYROLIUM_PRESTATION_VIEW')]
@@ -266,10 +273,10 @@ class TyroliumPrestationController extends AbstractController
             if (null === $client) {
                 return apiError('Utilisateur introuvable.', 404);
             }
-        } elseif (null === $clientName || null === $clientEmail) {
+        } elseif (null === $clientName) {
             // Voir Prestation.php : au moins un des deux moyens d'identifier
             // le client est obligatoire, sinon la prestation est orpheline.
-            return apiError('Renseigne soit userId, soit clientName ET clientEmail.', 400);
+            return apiError('Renseigne soit userId, soit clientName.', 400);
         }
 
         $prestation = new Prestation();
@@ -365,8 +372,8 @@ class TyroliumPrestationController extends AbstractController
             }
             $prestation->setClientEmail($payload['clientEmail']);
         }
-        if (null === $prestation->getUser() && (null === $prestation->getClientName() || null === $prestation->getClientEmail())) {
-            return apiError('Une prestation doit toujours avoir soit un userId, soit clientName ET clientEmail.', 400);
+        if (null === $prestation->getUser() && null === $prestation->getClientName()) {
+            return apiError('Une prestation doit toujours avoir soit un userId, soit clientName.', 400);
         }
         if (array_key_exists('content', $payload)) {
             if (null !== $payload['content'] && !is_string($payload['content'])) {

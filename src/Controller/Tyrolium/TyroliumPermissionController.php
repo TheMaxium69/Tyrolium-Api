@@ -6,6 +6,7 @@ use App\Entity\Permission;
 use App\Entity\User;
 use App\Entity\UserPermission;
 use App\Enum\AccessLevel;
+use App\Helper\Pagination;
 use App\Repository\PermissionRepository;
 use App\Repository\UserPermissionRepository;
 use App\Repository\UserRepository;
@@ -50,14 +51,17 @@ class TyroliumPermissionController extends AbstractController
 
     #[IsGranted('ROLE_INTERNE')]
     #[Route('/tyrolium/permission/get-all-permission', name: 'tyrolium_permission_get_all_permission', methods: ['GET'])]
-    public function getAllPermission(): JsonResponse
+    public function getAllPermission(Request $request): JsonResponse
     {
-        $permissions = array_map(
-            fn (Permission $permission): array => $this->normalizePermission($permission),
-            $this->permissionRepository->findAll(),
+        $result = Pagination::fromQueryBuilder(
+            $this->permissionRepository->createQueryBuilder('p')->orderBy('p.id', 'ASC'),
+            $request,
         );
 
-        return apiSuccess(data: $permissions);
+        return apiSuccess(
+            data: array_map(fn (Permission $permission): array => $this->normalizePermission($permission), $result['items']),
+            meta: ['pagination' => $result['pagination']],
+        );
     }
 
     #[IsGranted('ROLE_OWNER')]

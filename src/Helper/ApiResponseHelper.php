@@ -43,7 +43,7 @@ if (!function_exists('apiResponse')) {
             'requestId' => $requestId,
             // getClientIp() ignores X-Forwarded-For unless framework.trusted_proxies is
             // configured for this exact connecting IP — safe by default, no spoofing risk.
-            'clientIp' => Request::createFromGlobals()->getClientIp() ?? '127.0.0.1',
+            'clientIp' => (new Request(server: $_SERVER))->getClientIp() ?? '127.0.0.1',
             'timestamp' => (new DateTimeImmutable())->format(DateTimeInterface::ATOM),
             'executionTimeMs' => $executionTimeMs,
         ];

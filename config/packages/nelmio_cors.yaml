@@ -7,4 +7,10 @@ nelmio_cors:
         expose_headers: ['Link']
         max_age: 3600
     paths:
+        # Tracking public appelé depuis les navigateurs des sites clients : toute origine.
+        '^/tyrolium/analytics/post-create-input$':
+            allow_origin: ['*']
+            allow_methods: ['POST', 'OPTIONS']
+            allow_headers: ['Content-Type']
+            max_age: 3600
         '^/': null
