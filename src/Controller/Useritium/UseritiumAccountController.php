@@ -4,11 +4,18 @@ namespace App\Controller\Useritium;
 
 use App\Entity\User;
 use App\Entity\UserEmail;
+use App\Enum\AccessLevel;
+use App\Enum\PrestationStatus;
+use App\Enum\ServerStatus;
+use App\Repository\PrestationRepository;
+use App\Repository\ServerRepository;
 use App\Repository\UserEmailRepository;
 use App\Repository\UserRepository;
 use App\Security\UserProvider;
+use Doctrine\DBAL\Exception\ForeignKeyConstraintViolationException;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
+use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -46,10 +53,13 @@ class UseritiumAccountController extends AbstractController
         private readonly EntityManagerInterface $entityManager,
         private readonly UserRepository $userRepository,
         private readonly UserEmailRepository $userEmailRepository,
+        private readonly PrestationRepository $prestationRepository,
+        private readonly ServerRepository $serverRepository,
         private readonly UserPasswordHasherInterface $passwordHasher,
         private readonly ValidatorInterface $validator,
         private readonly UserProvider $userProvider,
         private readonly NormalizerInterface $serializer,
+        private readonly JWTTokenManagerInterface $jwtManager,
         #[Autowire('%kernel.environment%')]
         private readonly string $environment,
     ) {
@@ -338,6 +348,51 @@ class UseritiumAccountController extends AbstractController
         return apiSuccess(data: $data);
     }
 
+    /**
+     * Le pseudo est l'identifiant du JWT : l'ancien token (et toutes les autres sessions)
+     * devient invalide dès le changement. La réponse contient donc un nouveau token, que
+     * le front doit stocker à la place de l'ancien. Le mot de passe actuel est exigé :
+     * le pseudo sert à se connecter, un token volé ne doit pas suffire à le changer.
+     */
+    #[IsGranted('IS_AUTHENTICATED_FULLY')]
+    #[Route('/useritium/account/put-update-username', name: 'useritium_account_put_update_username', methods: ['PUT'])]
+    public function putUpdateUsername(Request $request, #[CurrentUser] User $user): JsonResponse
+    {
+        $payload = json_decode($request->getContent(), true) ?? [];
+        $username = $payload['username'] ?? null;
+        $password = $payload['password'] ?? null;
+
+        if (!is_string($username) || !is_string($password)) {
+            return apiError('username et password (mot de passe actuel) sont obligatoires.', 400);
+        }
+
+        if (!$this->passwordHasher->isPasswordValid($user, $password)) {
+            return apiError('Mot de passe incorrect.', 403);
+        }
+
+        if ($username === $user->getUsername()) {
+            return apiError('Ce pseudo est déjà le tien.', 400);
+        }
+
+        $user->setUsername($username);
+
+        $violations = $this->validator->validate($user);
+        if (count($violations) > 0) {
+            return apiValidationError($violations, 'Pseudo invalide.');
+        }
+
+        try {
+            $this->entityManager->flush();
+        } catch (UniqueConstraintViolationException) {
+            return apiError('Ce pseudo est déjà pris.', 409);
+        }
+
+        $data = $this->normalizeUser($user);
+        $data['token'] = $this->jwtManager->create($user);
+
+        return apiSuccess(data: $data, message: 'Pseudo mis à jour. Remplace ton token par celui-ci : l\'ancien n\'est plus valable.');
+    }
+
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
     #[Route('/useritium/account/put-update-display-name', name: 'useritium_account_put_update_display_name', methods: ['PUT'])]
     public function putUpdateDisplayName(Request $request, #[CurrentUser] User $user): JsonResponse
@@ -383,16 +438,136 @@ class UseritiumAccountController extends AbstractController
         $filename = bin2hex(random_bytes(16)).'.'.$extension;
         $file->move($directory, $filename);
 
-        $previous = $user->getPp();
-        $previousPath = null !== $previous ? $this->getParameter('kernel.project_dir').'/public'.$previous : null;
-        if (null !== $previousPath && is_file($previousPath)) {
-            unlink($previousPath);
-        }
+        $this->removeAvatarFile($user->getPp());
 
         $user->setPp('/uploads/avatars/'.$filename);
         $this->entityManager->flush();
 
         return apiSuccess(data: $this->normalizeUser($user), message: 'Photo de profil mise à jour.');
+    }
+
+    /**
+     * Change le mot de passe d'un compte connecté. Toutes les sessions sont invalidées, y compris
+     * celle-ci : un token émis dans la même seconde que l'invalidation serait lui aussi rejeté
+     * (voir User::invalidateAllTokens()), donc le front renvoie vers la connexion. Même logique
+     * que post-reset-password.
+     */
+    #[IsGranted('IS_AUTHENTICATED_FULLY')]
+    #[Route('/useritium/account/put-update-password', name: 'useritium_account_put_update_password', methods: ['PUT'])]
+    public function putUpdatePassword(Request $request, #[CurrentUser] User $user): JsonResponse
+    {
+        $payload = json_decode($request->getContent(), true) ?? [];
+        $currentPassword = $payload['currentPassword'] ?? null;
+        $newPassword = $payload['newPassword'] ?? null;
+
+        if (!is_string($currentPassword) || !is_string($newPassword)) {
+            return apiError('currentPassword et newPassword sont obligatoires.', 400);
+        }
+
+        if (!$this->passwordHasher->isPasswordValid($user, $currentPassword)) {
+            return apiError('Mot de passe actuel incorrect.', 403);
+        }
+
+        $violations = $this->validator->validate($newPassword, [
+            new Assert\NotBlank(message: 'Le mot de passe est obligatoire.'),
+            new Assert\Length(min: 8, minMessage: 'Le mot de passe doit contenir au moins 8 caractères.'),
+        ]);
+        if (count($violations) > 0) {
+            return apiValidationError($violations, 'Mot de passe invalide.');
+        }
+
+        if ($currentPassword === $newPassword) {
+            return apiError('Le nouveau mot de passe doit être différent de l\'actuel.', 400);
+        }
+
+        $user->setPassword($this->passwordHasher->hashPassword($user, $newPassword));
+        $user->invalidateAllTokens();
+        $this->entityManager->flush();
+
+        return apiSuccess(message: 'Mot de passe mis à jour. Toutes les sessions sont déconnectées : reconnecte-toi avec le nouveau mot de passe.');
+    }
+
+    #[IsGranted('IS_AUTHENTICATED_FULLY')]
+    #[Route('/useritium/account/delete-pp', name: 'useritium_account_delete_pp', methods: ['DELETE'])]
+    public function deletePp(#[CurrentUser] User $user): JsonResponse
+    {
+        $previous = $user->getPp();
+        $user->setPp(null);
+        $this->entityManager->flush();
+        $this->removeAvatarFile($previous);
+
+        return apiSuccess(data: $this->normalizeUser($user), message: 'Photo de profil supprimée.');
+    }
+
+    /**
+     * Suppression définitive de son propre compte (réservée aux comptes publics : un compte interne
+     * ou owner passe par un owner). Refusée tant que le compte a des prestations ou serveurs en
+     * cours. Pour ne pas laisser de prestation, de serveur ou de site sans client, le compte
+     * supprimé est remplacé par le nom « Compte supprimé » dans ces enregistrements.
+     */
+    #[IsGranted('IS_AUTHENTICATED_FULLY')]
+    #[Route('/useritium/account/delete-account', name: 'useritium_account_delete_account', methods: ['DELETE'])]
+    public function deleteAccount(Request $request, #[CurrentUser] User $user): JsonResponse
+    {
+        $payload = json_decode($request->getContent(), true) ?? [];
+        $password = $payload['password'] ?? null;
+
+        if (!is_string($password)) {
+            return apiError('password (mot de passe actuel) est obligatoire pour supprimer le compte.', 400);
+        }
+
+        if (!$this->passwordHasher->isPasswordValid($user, $password)) {
+            return apiError('Mot de passe incorrect.', 403);
+        }
+
+        if (AccessLevel::USER !== $user->getAccessLevel()) {
+            return apiError('Un compte interne ne peut pas être supprimé ici : contacte un owner.', 403);
+        }
+
+        $activePrestations = $this->prestationRepository->count([
+            'user' => $user,
+            'status' => [PrestationStatus::PENDING, PrestationStatus::ACTIVE, PrestationStatus::SUSPENDED],
+        ]);
+        $activeServers = $this->serverRepository->count([
+            'user' => $user,
+            'status' => [ServerStatus::PROVISIONING, ServerStatus::ACTIVE, ServerStatus::MAINTENANCE, ServerStatus::SUSPENDED],
+        ]);
+        if ($activePrestations > 0 || $activeServers > 0) {
+            return apiError('Tu as encore des prestations ou des serveurs en cours : contacte le support avant de supprimer ton compte.', 409);
+        }
+
+        $previousPp = $user->getPp();
+
+        try {
+            $this->entityManager->wrapInTransaction(function () use ($user): void {
+                foreach (['Prestation', 'Server', 'Website'] as $entity) {
+                    $this->entityManager
+                        ->createQuery('UPDATE App\\Entity\\'.$entity.' e SET e.clientName = :name WHERE e.user = :user AND e.clientName IS NULL')
+                        ->setParameter('name', 'Compte supprimé')
+                        ->setParameter('user', $user)
+                        ->execute();
+                }
+                $this->entityManager->remove($user);
+            });
+        } catch (ForeignKeyConstraintViolationException) {
+            return apiError('Ce compte est lié à des données internes et ne peut pas être supprimé : contacte le support.', 409);
+        }
+
+        $this->removeAvatarFile($previousPp);
+
+        return apiSuccess(message: 'Compte supprimé définitivement.');
+    }
+
+    private function removeAvatarFile(?string $pp): void
+    {
+        if (null === $pp || !str_starts_with($pp, '/uploads/avatars/') || str_contains($pp, '..')) {
+            return;
+        }
+
+        $path = $this->getParameter('kernel.project_dir').'/public'.$pp;
+        if (is_file($path)) {
+            unlink($path);
+        }
     }
 
     /**
