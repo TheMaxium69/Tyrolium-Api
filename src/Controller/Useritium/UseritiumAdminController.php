@@ -47,10 +47,18 @@ class UseritiumAdminController extends AbstractController
     #[Route('/useritium/admin/get-all-user', name: 'useritium_admin_get_all_user', methods: ['GET'])]
     public function getAllUser(Request $request): JsonResponse
     {
-        $result = Pagination::fromQueryBuilder(
-            $this->userRepository->createQueryBuilder('u')->orderBy('u.id', 'ASC'),
-            $request,
-        );
+        $queryBuilder = $this->userRepository->createQueryBuilder('u')->orderBy('u.id', 'ASC');
+
+        $accessLevelParam = $request->query->get('accessLevel');
+        if (null !== $accessLevelParam) {
+            $accessLevel = AccessLevel::tryFrom((string) $accessLevelParam);
+            if (null === $accessLevel) {
+                return apiError("accessLevel doit être 'user', 'interne' ou 'owner'.", 400);
+            }
+            $queryBuilder->andWhere('u.accessLevel = :accessLevel')->setParameter('accessLevel', $accessLevel);
+        }
+
+        $result = Pagination::fromQueryBuilder($queryBuilder, $request);
 
         return apiSuccess(
             data: array_map(fn (User $user): array => $this->normalizeUser($user), $result['items']),
