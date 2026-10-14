@@ -294,6 +294,13 @@ class TyroliumPrestationController extends AbstractController
         if (isset($payload['content']) && is_string($payload['content'])) {
             $prestation->setContent($payload['content']);
         }
+        if (array_key_exists('gitRepository', $payload)) {
+            if (null !== $payload['gitRepository'] && !is_string($payload['gitRepository'])) {
+                return apiError('gitRepository doit être une chaîne ou null.', 400);
+            }
+            $gitRepository = null === $payload['gitRepository'] ? null : trim($payload['gitRepository']);
+            $prestation->setGitRepository('' === $gitRepository ? null : $gitRepository);
+        }
         if (isset($payload['progress'])) {
             if (!is_int($payload['progress'])) {
                 return apiError('progress doit être un entier entre 0 et 100.', 400);
@@ -374,6 +381,13 @@ class TyroliumPrestationController extends AbstractController
         }
         if (null === $prestation->getUser() && null === $prestation->getClientName()) {
             return apiError('Une prestation doit toujours avoir soit un userId, soit clientName.', 400);
+        }
+        if (array_key_exists('gitRepository', $payload)) {
+            if (null !== $payload['gitRepository'] && !is_string($payload['gitRepository'])) {
+                return apiError('gitRepository doit être une chaîne ou null.', 400);
+            }
+            $gitRepository = null === $payload['gitRepository'] ? null : trim($payload['gitRepository']);
+            $prestation->setGitRepository('' === $gitRepository ? null : $gitRepository);
         }
         if (array_key_exists('content', $payload)) {
             if (null !== $payload['content'] && !is_string($payload['content'])) {

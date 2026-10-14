@@ -29,7 +29,7 @@ class Offre
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'integer')]
-    #[Groups(['offre:read'])]
+    #[Groups(['offre:read', 'offre:identifier'])]
     private ?int $id = null;
 
     /**
@@ -37,12 +37,12 @@ class Offre
      * libre (décision de Maxime, 26/09/2026), juste unique.
      */
     #[ORM\Column(type: 'string', length: 100, unique: true)]
-    #[Groups(['offre:read'])]
+    #[Groups(['offre:read', 'offre:identifier'])]
     #[Assert\NotBlank(message: 'Le tagName est obligatoire.')]
     private ?string $tagName = null;
 
     #[ORM\Column(type: 'string', length: 255)]
-    #[Groups(['offre:read'])]
+    #[Groups(['offre:read', 'offre:identifier'])]
     #[Assert\NotBlank(message: 'Le displayName est obligatoire.')]
     private ?string $displayName = null;
 

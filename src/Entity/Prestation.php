@@ -22,12 +22,12 @@ class Prestation
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'integer')]
-    #[Groups(['prestation:read'])]
+    #[Groups(['prestation:read', 'prestation:identifier'])]
     private ?int $id = null;
 
     #[ORM\ManyToOne(targetEntity: Offre::class)]
     #[ORM\JoinColumn(name: 'offre_id', referencedColumnName: 'id', nullable: false, onDelete: 'RESTRICT')]
-    #[Groups(['prestation:read'])]
+    #[Groups(['prestation:read', 'prestation:identifier'])]
     private ?Offre $offre = null;
 
     #[ORM\ManyToOne(targetEntity: User::class)]
@@ -36,7 +36,7 @@ class Prestation
     private ?User $user = null;
 
     #[ORM\Column(type: 'string', length: 255, nullable: true)]
-    #[Groups(['prestation:read'])]
+    #[Groups(['prestation:read', 'prestation:identifier'])]
     private ?string $clientName = null;
 
     #[ORM\Column(type: 'string', length: 180, nullable: true)]
@@ -45,12 +45,24 @@ class Prestation
     private ?string $clientEmail = null;
 
     #[ORM\Column(type: 'string', length: 20, enumType: PrestationStatus::class)]
-    #[Groups(['prestation:read'])]
+    #[Groups(['prestation:read', 'prestation:identifier'])]
     private PrestationStatus $status = PrestationStatus::PENDING;
 
     #[ORM\Column(type: 'text', nullable: true)]
     #[Groups(['prestation:read'])]
     private ?string $content = null;
+
+    /**
+     * URL du dépôt git de la prestation (https://..., ssh://... ou git@hote:chemin).
+     */
+    #[ORM\Column(type: 'string', length: 500, nullable: true)]
+    #[Groups(['prestation:read'])]
+    #[Assert\Length(max: 500)]
+    #[Assert\Regex(
+        pattern: Website::GIT_REPOSITORY_PATTERN,
+        message: 'Dépôt git invalide (https://..., ssh://... ou git@hote:chemin).',
+    )]
+    private ?string $gitRepository = null;
 
     /**
      * Avancement de la prestation, 0-100 — affiché en barre de progression
@@ -166,6 +178,18 @@ class Prestation
     public function setContent(?string $content): static
     {
         $this->content = $content;
+
+        return $this;
+    }
+
+    public function getGitRepository(): ?string
+    {
+        return $this->gitRepository;
+    }
+
+    public function setGitRepository(?string $gitRepository): static
+    {
+        $this->gitRepository = $gitRepository;
 
         return $this;
     }
