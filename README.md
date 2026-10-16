@@ -99,17 +99,19 @@ config/
   secrets/         # Symfony Secrets Vault (par environnement)
 src/
   Controller/      # controllers métier, un dossier par namespace (Useritium/, Tyrolium/, SolidServ/...)
-    Useritium/     # Account (compte, JWT), Admin (administration des comptes), Dashboard (carte utilisateur)
+    Useritium/     # Account (compte, JWT), Admin (administration des comptes), Dashboard (carte utilisateur, mes prestations / serveurs / sites), Note (notes façon Keep), Task et TaskProject (tâches et kanban)
     Tyrolium/      # Permission (RBAC), ApiKey, Prestation (offres + prestations), Analytics, WebSite
     SolidServ/     # Product (catalogue), Dashboard (parc de serveurs + types de serveurs)
     Test/          # exemples pédagogiques de permissions — pas du métier
-  Entity/          # 14 entités à plat (User, Permission, ApiKey, Offre, Prestation, Website, SolidServProduct, Server...) — jamais triées par namespace, contrairement aux Controller
+  Entity/          # 20 entités à plat (User, Permission, ApiKey, Offre, Prestation, Website, SolidServProduct, Server, Note, Task, TaskProject...) — jamais triées par namespace, contrairement aux Controller
   Repository/      # un repository par entité
   Security/        # UserProvider, UserChecker, Authentication{Success,Failure}Handler, OwnerBypassVoter, ApiKeyTokenHandler
   Enum/            # AccessLevel, Filiale, OffreVisibility, PrestationStatus, ServerStatus, WebsiteOwnerType, WebsiteStatus, ApiKeyEnvironment
+  Service/         # TaskPlacement (positions / glisser-déposer), TaskPresenter (sortie JSON des tâches)
+  Command/         # app:note:purge-trash (corbeille des notes, à planifier en prod)
   EventSubscriber/ # ApiRateLimitSubscriber
   Helper/          # ApiResponseHelper (fonctions globales, hors PSR-4), Pagination
-migrations/        # 24 migrations Doctrine
+migrations/        # 27 migrations Doctrine
 public/             # index.php, analytics.js (script de tracking à coller sur les sites suivis), uploads/ (photos de profil, gitignoré)
 tests/             # bootstrap seulement — aucun test PHPUnit pour l'instant
 .doc/              # documentation technique complète (voir plus bas)
